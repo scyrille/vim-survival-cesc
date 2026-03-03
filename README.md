@@ -1,5 +1,4 @@
-# Model-agnostic variable importance with pathway-level aggregation to support reproducible translational oncology
-## Application to cervical cancer
+# Model-agnostic variable importance with pathway-level aggregation to support reproducible translational oncology: application to cervical cancer
 
 ## Context 
 
@@ -96,6 +95,7 @@ The Bio-RAIDs cohort consists of clinically annotated cervical cancer patients f
 ```
 
 **TCGA-CESC**: 
+```
 @misc{Lucchesi2016,
   title     = "The Cancer Genome Atlas Cervical Squamous Cell Carcinoma and
                Endocervical Adenocarcinoma collection ({TCGA-CESC})",
@@ -121,6 +121,7 @@ The Bio-RAIDs cohort consists of clinically annotated cervical cancer patients f
   publisher = "The Cancer Imaging Archive",
   year      =  2016
 }
+```
 
 **Conditional survival estimation using global survival stacking:**
 ```
