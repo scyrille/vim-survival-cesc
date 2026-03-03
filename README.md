@@ -37,6 +37,7 @@ install.packages(c(
   "survival",
   "tidyverse",
   "ranger",
+  "xgboost", 
   "glmnet",
   "SuperLearner"
 ))
