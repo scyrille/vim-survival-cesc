@@ -51,9 +51,12 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 BiocManager::install("TCGAbiolinks")
 ```
 
+## Overall analytical workflow
+
+
 ## Data access 
 
-1. TCGA-CESC cohort [@Lucchesi2016]
+1. TCGA-CESC cohort
 
 Data from *The Cancer Genome Atlas (TCGA)* project CESC (Cervical Squamous Carcinoma and Endocervical Adenocarcinoma) are publicly available through the *Genomic Data Commons*.
 
@@ -64,17 +67,16 @@ Data can be accessed via:
 
 In this repository, TCGA data are downloaded programmatically using `TCGAbiolinks` and saved locally in: 
 
-data/external/tcga/
+data/tcga/raw
 
 
-2. Bio-RAIDs cohort (NCT02428842) [@ngo_prospective_2015]
+2. Bio-RAIDs cohort (NCT02428842)
 
 The Bio-RAIDs cohort consists of clinically annotated cervical cancer patients frim a multicenter European study. 
 
 * These data are **not publicly available**.
 * Access is subject to institutional agreements and data-sharing policies.
 * The data are not stored locally and **not distributed with this repository**.
-
 
 ## References 
 
