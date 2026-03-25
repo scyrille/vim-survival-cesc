@@ -1,29 +1,3 @@
-
-# ======================
-# Data (critical)
-# ======================
-data/raw/raids/
-data/raw/tcga/
-data/processed/raids/
-*.csv
-*.tsv
-*.xlsx
-*.xls
-*.rda
-*.rds
-*.bed
-
-# ======================
-# Outputs
-# ======================
-outputs/results/
-outputs/figures/
-outputs/tables/
-*.png
-*.pdf
-*.html
-*.rds
-
 # =========================
 # R specific
 # =========================
@@ -32,6 +6,26 @@ outputs/tables/
 .Ruserdata
 .Rproj.user/
 *.Rproj
+
+# ======================
+# Data (critical)
+# ======================
+data/raw/*
+!data/raw/dna_gene_sets.csv
+!data/raw/rna_gene_sets.csv
+!data/raw/cancerGeneList.tsv
+!data/raw/gencode.v34.annotation_gene.bed
+data/processed/
+
+# ======================
+# Outputs
+# ======================
+outputs/
+
+# ======================
+# Documents
+# ======================
+docs/
 
 # =========================
 # Quarto / RMarkdown
