@@ -175,7 +175,7 @@ pivot_wider_dna <- function(df,
                         by = "wes_tumor")%>%
       tidyr::pivot_wider(names_from = signature, values_from = value)%>%
       dplyr::select(-wes_tumor)%>%
-      dpyr::mutate(across(-all_of(id_col), ~ifelse(.x!=0, 1, 0)))%>%
+      dplyr::mutate(across(-all_of(id_col), ~ifelse(.x!=0, 1, 0)))%>%
       labelled::set_variable_labels(
         .labels = paste("Mutational signature subgroup -", 
                         names(.)))%>%
@@ -289,15 +289,19 @@ filter_out_non_altered_genes <- function(df,
                                                     "cnv_", 
                                                     "snv_", 
                                                     "fusion_")){
-  non_altered_genes <- df %>%
-    dplyr::select(dplyr::starts_with(prefix)) %>%
+  
+  cols <- df %>%
+    dplyr::select(dplyr::matches(paste0("^(", paste(prefix, collapse = "|"), ")")))
+  
+  non_altered_genes <- cols %>%
     dplyr::summarise(
       dplyr::across(everything(),
-                    ~ sum(. == 1, na.rm = TRUE) / dplyr::n())) %>%
+                    ~ sum(. == 1, na.rm = TRUE) / dplyr::n())
+    ) %>%
     dplyr::select(where(~ .x == 0)) %>%
     names()
   
-  data %>%
+  df %>%
     dplyr::select(-dplyr::all_of(non_altered_genes))
 }
 
@@ -323,7 +327,8 @@ filter_out_non_altered_genes <- function(df,
 filter_out_low_expressed_genes <- function(df, prefix = "rna_seq_"){
   
   n_patients <- nrow(df)
-  low_expressed_genes <- data %>%
+  
+  low_expressed_genes <- df %>%
     dplyr::select(starts_with(prefix))%>%
     # count number of patients with expressed genes
     dplyr::summarise(across(everything(),~sum(.x >= 1)))%>% 
@@ -331,7 +336,7 @@ filter_out_low_expressed_genes <- function(df, prefix = "rna_seq_"){
     dplyr::select_if(.<0.2*n_patients)%>% 
     names()
   
-  data %>% 
+  df %>% 
     dplyr::select(-all_of(low_expressed_genes))
 }
 
@@ -351,16 +356,20 @@ filter_out_low_expressed_genes <- function(df, prefix = "rna_seq_"){
 #' @export
 filter_main_sig_group <- function(df){
   
-  var_non_main_sig_group <- df %>%
-    dplyr::select(starts_with("sig_group_")) %>%
-    # mutational signature subgroups rates in the sample
-    dplyr::summarise(across(everything(), ~sum(.==1) / n()))%>% 
-    as.vector()%>%
-    unlist()%>%
-    sort(decreasing = TRUE)%>%
-    .[-c(1:6)]%>%
-    names()
+  sig_rates <- df %>%
+    dplyr::select(dplyr::starts_with("sig_group_")) %>%
+    dplyr::summarise(
+      dplyr::across(everything(), ~ sum(. == 1, na.rm = TRUE) / dplyr::n())
+    )
+  
+  var_non_main_sig_group <- sig_rates %>%
+    as.numeric() %>%
+    sort(decreasing = TRUE) %>%
+    {
+      names(sig_rates)[match(., sig_rates)]
+    } %>%
+    .[-seq_len(min(6, length(.)))]
   
   df %>%
-    dplyr::select(-all_of(var_non_main_sig_group)) 
+    dplyr::select(-dplyr::all_of(var_non_main_sig_group)) 
 }
