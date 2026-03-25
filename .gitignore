@@ -1,7 +1,41 @@
-.Rproj.user/55484A60/pcs/files-pane.pper
-.Rproj.user/55484A60/pcs/source-pane.pper
-.Rproj.user/55484A60/pcs/windowlayoutstate.pper
-.Rproj.user/55484A60/pcs/workbench-pane.pper
-.Rproj.user/55484A60/rmd-outputs
-.Rproj.user/55484A60/saved_source_markers
-.Rproj.user/shared/notebooks/patch-chunk-names
+
+# ======================
+# Data (critical)
+# ======================
+data/raw/raids/
+data/raw/tcga/
+data/processed/raids/
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.rda
+*.rds
+*.bed
+
+# ======================
+# Outputs
+# ======================
+outputs/results/
+outputs/figures/
+outputs/tables/
+*.png
+*.pdf
+*.html
+*.rds
+
+# =========================
+# R specific
+# =========================
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+*.Rproj
+
+# =========================
+# Quarto / RMarkdown
+# =========================
+*_files/
+*.knit.md
+*.utf8.md
