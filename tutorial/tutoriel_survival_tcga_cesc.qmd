@@ -1,0 +1,1163 @@
+---
+title: "Tutoriel sur les méthodes avancées d'analyse de survie en contexte multi-omique: Lasso, boosting et importance des variables"
+subtitle: "Application aux données du TCGA"
+date: last-modified
+lang: fr
+format: 
+  html: 
+    toc: true
+    toc-depth: 5
+    number-depth: 5
+    embed-resources: true
+execute: 
+  message: false
+  warning: false
+fig-align: "center"
+fig-cap-location: top
+fig-format: png
+html-math-method: mathml
+link-citations: true
+bibliography: references.bib
+---
+
+# Introduction
+
+L’analyse de données omiques en oncologie repose sur des jeux de données de grande dimension, caractérisés par un nombre élevé de variables par rapport au nombre de patients. Dans ce contexte, les méthodes de régression pénalisée et d’apprentissage automatique constituent des outils essentiels pour la sélection de variables, la modélisation pronostique et l’interprétation biologique.
+
+Ce tutoriel propose une introduction pratique à plusieurs approches modernes d’analyse de survie adaptées aux données de haute dimension, incluant les régressions pénalisées (*Lasso*, *Group Lasso* et *Priority Lasso*), le *Cox boosting*, ainsi que les méthodes d’évaluation de l’importance des variables dans un cadre non paraamétrique.
+
+Les méthodes présentées permettent d’identifier des signatures moléculaires pertinentes tout en tenant compte de la structure des données (par exemple, regroupement en pathways). 
+
+Les analyses sont illustrées à partir des données du projet TCGA, plus spécifiquement de la cohorte CESC (cancer du col de l’utérus) [@Lucchesi2016]. Ces données combinent informations cliniques et profils omiques (ADN et ARN), offrant un cadre réaliste pour l’évaluation comparative des différentes approches.
+
+Ce tutoriel vise à fournir des éléments méthodologiques et pratiques pour :
+- construire des modèles pronostiques en présence de données censurées,
+- sélectionner des variables pertinentes dans des contextes de grande dimension,
+- comparer différentes stratégies de pénalisation,
+- et quantifier l’apport incrémental de variables moléculaires au-delà des facteurs cliniques.
+
+L’ensemble des analyses est reproductible et implémenté à l’aide de packages R dédiés, afin de faciliter leur réutilisation dans des contextes similaires.
+
+# Pré-requis
+
+Avant de commencer, assurez-vous d’avoir installé les packages nécessaires et chargé les fonctions du dépôt.
+
+📦 **Installation des packages**
+
+Les packages requis sont listés dans les scripts du projet. Vous pouvez les installer automatiquement avec :
+
+```{r eval = F}
+required_packages <- c(
+  # Data manipulation
+  "tidyverse","janitor","labelled","here","gtools",
+  # Summary tables and plots
+  "gt","gtsummary","flextable","ggVennDiagram","egg", 
+  # Survival analysis
+  "survival","survminer",
+  "glmnet","grpreg","prioritylasso",
+  "CoxBoost", 
+  "ranger","xgboost", 
+  "SuperLearner",
+  "survML",                    
+)
+
+installed <- rownames(installed.packages())
+to_install <- setdiff(required_packages, installed)
+
+if (length(to_install) > 0) {
+  install.packages(to_install)
+}
+```
+
+📁 **Chargement des fonctions du dépôt**
+
+Les fonctions personnalisées sont disponibles dans le dossier `R/`. Chargez-les avec :
+
+```{r}
+r_files <- list.files(here::here("R"), pattern = "\\.R$", full.names = TRUE)
+invisible(lapply(r_files, source))
+```
+
+✅ **Vérification**
+
+```{r eval = F}
+lapply(required_packages, require, character.only = TRUE)
+```
+
+# Préparation des données 
+
+La cohorte TCGA-CESC comprend des patientes atteintes d’un cancer du col de l’utérus primitif, histologiquement confirmé, disposant d’échantillons tumoraux et normaux appariés de haute qualité, adaptés à un profilage moléculaire complet, ainsi que d’annotations cliniques collectées selon les protocoles standardisés du TCGA [@Lucchesi2016; @tcga_research_network2017].
+
+Le portail de données du TCGA (https://portal.gdc.cancer.gov) a été utilisé pour obtenir les données de variations du nombre de copies (CNV), de variations nucléotidiques simples (SNV) et d’expression génique (ARN), ainsi que les informations cliniques correspondantes pour les patientes CESC.
+
+La survie sans progression a été dérivée de l'article de Cheng *et al.* [@Cheng2017]. Cette ressource fournit des données de survie standardisées et curées pour l’ensemble des types tumoraux du TCGA, permettant des analyses de temps jusqu’à événement.
+
+Les variants somatiques et les altérations du nombre de copies ont été analysés en fonction de leur impact fonctionnel et de la catégorie de gène (oncogène, gène suppresseur de tumeur [TSG], les deux ou inconnu), telle que définie dans OncoKB (v3.1, février 2021).
+
+Pour les oncogènes, ont été retenues les amplifications focales (≤ 10 Mb) ainsi que les variants activateurs — mutations faux-sens pathogènes ou insertions/délétions en phase (in-frame) rapportées dans COSMIC.
+
+Pour les gènes suppresseurs de tumeur, ont été considérées les délétions homozygotes ainsi que les variants inactivants, incluant les mutations faux-sens pathogènes, les indels en phase et les mutations tronquantes (stop-gain, frameshift, sites d’épissage). L’ensemble de ces altérations a également été retenu pour les gènes annotés comme appartenant aux deux catégories ou comme inconnus.
+
+L’intégration et l’harmonisation des données ont consisté à combiner les informations cliniques, génomiques et transcriptomiques au sein de chaque cohorte afin de constituer un jeu de données d’analyse harmonisé. Cette étape incluait des procédures de contrôle qualité, le mapping des variables et l’alignement des caractéristiques moléculaires. Seuls les patients disposant d’annotations cliniques complètes et de profils moléculaires disponibles ont été inclus dans l’analyse.
+
+L’âge au diagnostic a été dichotomisé à 50 ans et codé en variable binaire (≤ 50 vs > 50 ans). Le stade tumoral a été harmonisé selon la classification de la Fédération Internationale de Gynécologie et d’Obstétrique (FIGO), puis dichotomisé en maladie à stade précoce (FIGO I–II) versus avancé (FIGO III–IV). Le statut vis-à-vis du papillomavirus humain (HPV) a été harmonisé en variable binaire (HPV positif vs HPV négatif), sur la base des annotations moléculaires disponibles. Ces variables cliniques ont ensuite été utilisées comme covariables dans l’ensemble des analyses ultérieures.
+
+L’ensemble des gènes OncoKB altérés identifiés a été cartographié dans 26 voies de signalisation, tandis que 257 gènes sont restés non classés. Une voie était considérée comme altérée dès lors qu’au moins un gène appartenant à cette voie présentait une variation somatique.
+
+L’activité des voies a été estimée à l’aide de la méthode *Gene Set Variation Analysis* (GSVA) [@Hanzelmann2013], qui calcule, pour chaque échantillon, des scores d’enrichissement pour des ensembles de gènes prédéfinis à partir des profils d’expression transcriptomique. L'analyse par GSVA est une approche non paramétrique et non supervisée qui transforme les données d’expression génique en métriques au niveau des voies, permettant d’évaluer l’activation relative des voies indépendamment des classes. Cette méthode capture les variations coordonnées d’expression des gènes au sein de voies biologiquement définies, fournissant ainsi un résumé robuste de l’activité moléculaire au niveau fonctionnel.
+
+Nous avons utilisé les 50 ensembles de gènes « Hallmark » de la base de données *Molecular Signatures Database* (MSigDB v7.5.1), qui représentent des processus biologiques et des voies de signalisation bien caractérisés [@Liberzon2011]. Pour chaque échantillon, les scores GSVA ont été calculés à l’aide du package R `GSVA` avec les paramètres par défaut, après normalisation des données d’expression RNA-seq.
+
+Les listes des processus biologiques et des voies de signalisation dérivées des données génomiques (ADN) et transcriptomiques (ARN) sont présentées respectivement dans les tables suivantes (@tbl-DNA-pathways-list; @tbl-RNA-pathways-list). 
+
+```{r echo = FALSE}
+#| label: tbl-DNA-pathways-list
+#| tbl-cap: "Description of the DNA-based pathways"
+
+tibble::tribble(
+  ~id, ~pathway, ~description,
+   1, "Adhesion/Migration", "Genes involved in the cellular adhesion / migration",
+   2, "Apoptose", "Genes mediating programmed cell death (apoptosis)",
+   3, "Cell cycle", "Genes involved in the regulation of the cell cycle",
+   4, "Cellular metabolism", "Genes involved in the cellular metabolism",
+   5, "Chromatin organization", "Genes involved in the structuring and modulation of chromatin, influencing DNA accessibility and the regulation of gene expression",
+   6, "Developpement ==> Notch", "Genes up-regulated by activation of Notch signaling",
+   7, "DNA repair", "Genes involved in DNA repair",
+   8, "Epigenetics", "Genes involved in the epigenetic mechanisms",
+   9, "Genome integrity ==> p53", "Genes involved in p53 pathways and networks",
+  10, "Hedgehog signaling pathway", "Genes up-regulated by activation of hedgehog signaling",
+  11, "Hippo signaling pathway", "Genes up-regulated by activation of Hippo signaling",
+  12, "Immunity", "Genes involved in the immune response",
+  13, "JAK-STAT signaling pathway", "Genes up-regulated by activation of JAK-STAT pathway",
+  14, "mRNA processing", "Genes involved in the maturation of messenger RNA (mRNA)",
+  15, "MAPK", "Genes up-regulated by activation of the MAPK pathway",
+  16, "Myc", "A subgroup of genes regulated by MYC",
+  17, "Oxydative stress", "Genes involved in the oxidative stress",
+  18, "PI3K", "Genes up-regulated by activation of the PI3K pathway",
+  19, "Proteins processing", "Genes involved in the processing of proteins",
+  20, "Regulation of gene expression", "Genes involved in the regulation of gene expression",
+  21, "RTK/RAS", "Genes up-regulated by activation of RTK/RAS signaling",
+  22, "Senescence", "Genes involved in the cellular senescence process",
+  23, "TGF-beta", "Genes up-regulated in response to TGF-beta (TGFB)",
+  24, "Transcription-factor regulator", "Genes involved in the regulation of transcription factors",
+  25, "Wnt signaling pathway", "Genes up-regulated by activation of WNT signaling",
+  26, "Others", "Unclassified genes"
+)%>%
+  gt::gt()%>%
+  tab_options(quarto.disable_processing = TRUE)%>%
+  cols_label(id = md("**N°**"),
+             pathway = md("**Pathway**"),
+             description = md("**Description**"))
+```
+
+```{r echo = FALSE}
+#| label: tbl-RNA-pathways-list
+#| tbl-cap: "Description of the RNA-based pathways"
+
+tibble::tribble(
+  ~id, ~pathway, ~description, ~category,
+   1, "APICAL_JUNCTION", "Genes encoding components of apical junction complex", "Cellular component",
+   2, "APICAL_SURFACE", "Genes encoding proteins over-represented on the apical surface of epithelial cells, e.g., important for cell polarity (apical area)", "Cellular component",
+   3, "PEROXISOME", "Genes encoding components of peroxisome", "Cellular component",
+   4, "ADIPOGENESIS", "Genes up-regulated during adipocyte differentiation (adipogenesis)", "Development",
+   5, "ANGIOGENESIS", "Genes up-regulated during formation of blood vessels (angiogenesis)", "Development",
+   6, "EPITHELIAL_MESENCHIMAL_TRANSITION", "Genes defining epithelial-mesenchymal transition, as in wound healing, fibrosis and metastasis", "Development",
+   7, "MYOGENESIS", "Genes involved in development of skeletal muscle (myogenesis)", "Development",
+   8, "SPERMATOGENESIS", "Genes up-regulated during production of male gametes (sperm), as in spermatogenesis", "Development",
+   9, "PANCREAS_BETA_CELL", "Genes specifically up-regulated in pancreatic beta cells", "Development",
+  10, "DNA_REPAIR", "Genes involved in DNA repair", "DNA damage",
+  11, "UV_RESPONSE_DOWN", "Genes down-regulated in response to ultraviolet (UV) radiation", "DNA damage",
+  12, "UV_RESPONSE_UP", "Genes up-regulated in response to ultraviolet (UV) radiation", "DNA damage",
+  13, "ALLOGRAFT_REJECTION", "Genes up-regulated during transplant rejection", "Immune",
+  14, "COAGULATION", "Genes encoding components of blood coagulation system; also up-regulated in platelets", "Immune",
+  15, "COMPLEMENT", "Genes encoding components of the complement system, which is part of the innate immune system", "Immune",
+  16, "INTERFERON_ALPHA_RESPONSE", "Genes up-regulated in response to alpha interferon proteins", "Immune",
+  17, "INTERFERON_GAMMA_RESPONSE", "Genes up-regulated in response to gamma interferon (IFNG)", "Immune",
+  18, "IL6_JAK_STAT3_SIGNALING", "Genes up-regulated by IL6 via STAT3, e.g., during acute phase response", "Immune",
+  19, "INFLAMMATORY_RESPONSE", "Genes defining inflammatory response", "Immune",
+  20, "BILE_ACID_METABOLISM", "Genes involve in metabolism of bile acids and salts", "Metabolic",
+  21, "CHOLESTEROL_HOMEOSTASIS", "Genes involved in cholesterol homeostasis", "Metabolic",
+  22, "FATTY_ACID_METABOLISM", "Genes encoding proteins involved in metabolism of fatty acids", "Metabolic",
+  23, "GLYCOLYSIS", "Genes encoding proteins involved in glycolysis and gluconeogenesis", "Metabolic",
+  24, "HEME_METABOLISM", "Genes involved in metabolism of heme (a cofactor consisting of iron and porphyrin) and erythroblast differentiation", "Metabolic",
+  25, "OXIDATIVE_PHOSPHORYLATION", "Genes encoding proteins involved in oxidative phosphorylation", "Metabolic",
+  26, "XENOBIOTIC_METABOLISM", "Genes encoding proteins involved in processing of drugs and other xenobiotics", "Metabolic",
+  27, "APOPTOSIS", "Genes mediating programmed cell death (apoptosis) by activation of caspases", "Pathway",
+  28, "HYPOXIA", "Genes up-regulated in response to low oxygen levels (hypoxia)", "Pathway",
+  29, "PROTEIN_SECRETION", "Genes involved in protein secretion pathway", "Pathway",
+  30, "ULFOLDED_PROTEIN_RESPONSE", "Genes up-regulated during unfolded protein response, a cellular stress response related to the endoplasmic reticulum", "Pathway",
+  31, "REACTIVE_OXYGEN_SPECIES_PATHWAY", "Genes up-regulated by reactive oxigen species (ROS)", "Pathway",
+  32, "E2F_TARGETS", "Genes encoding cell cycle related targets of E2F transcription factors", "Proliferation",
+  33, "G2M_CHECKPOINT", "Genes involved in the G2/M checkpoint, as in progression through the cell division cycle", "Proliferation",
+  34, "MYC_TARGETS_V1", "A subgroup of genes regulated by MYC - version 1 (v1)", "Proliferation",
+  35, "MYC_TARGETS_V2", "A subgroup of genes regulated by MYC - version 2 (v2)", "Proliferation",
+  36, "P53_PATHWAY", "Genes involved in p53 pathways and networks", "Proliferation",
+  37, "MITOTIC_SPINDLE", "Genes important for mitotic spindle assembly", "Proliferation",
+  38, "ANDROGEN_RESPONSE", "Genes defining response to androgens", "Signaling",
+  39, "ESTROGEN_RESPONSE_EARLY", "Genes defining early response to estrogen", "Signaling",
+  40, "ESTROGEN_RESPONSE_LATE", "Genes defining late response to estrogen", "Signaling",
+  41, "IL2_JAK_STAT5_SIGNALING", "Genes up-regulated by STAT5 in response to IL2 stimulation", "Signaling",
+  42, "KRAS_SIGNALING_UP", "Genes up-regulated by KRAS activation", "Signaling",
+  43, "KRAS_SIGNALING_DOWN", "Genes down-regulated by KRAS activation", "Signaling",
+  44, "MTORC1_SIGNALING", "Genes up-regulated through activation of mTORC1 complex", "Signaling",
+  45, "NOTCH_SIGNALING", "Genes up-regulated by activation of Notch signaling", "Signaling",
+  46, "PI3K_AKT_MTOR_SIGNALING", "Genes up-regulated by activation of the PI3K/AKT/mTOR pathway", "Signaling",
+  47, "HEDGEHOG_SIGNALING", "Genes up-regulated by activation of hedgehog signaling", "Signaling",
+  48, "TGF_BETA_SIGNALING", "Genes up-regulated in response to TGF-beta 1 (TGFB1)", "Signaling",
+  49, "TNFA_SIGNALING_VIA_NFKB", "Genes regulated by NF-kB in response to TNF", "Signaling",
+  50, "WNT_BETA_CATENIN_SIGNALING", "Genes up-regulated by activation of WNT signaling through accumulation of beta catenin CTNNB1", "Signaling"
+)%>%
+  gt::gt()%>%
+  tab_options(quarto.disable_processing = TRUE)%>%
+  cols_label(id = md("**N°**"),
+             pathway = md("**Pathway**"),
+             description = md("**Description**"),
+             category = md("**Process category**"))
+```
+
+Les données prétraitées peuvent être importées directement à l'aide de la fonction `read_processed()`. 
+
+```{r}
+tcga <- read_processed(cohort = "tcga")
+tcga_clin <- tcga$clin
+tcga_pathway <- tcga$pathway$clin_dna_rna
+```
+
+# Analyse descriptive 
+
+Des diagrammes de Venn illustrant la répartition des patients en fonction de la disponibilité des données de séquençage ou des données omiques et des données cliniques sont présentés respectivement dans @fig-venn-sequencing et @fig-venn-omics. Au total, 228 patients ont été inclus dans l'analyse. 
+
+```{r}
+#| label: fig-venn-sequencing
+#| fig-width: 6
+#| fig-height: 4
+#| fig-cap: "Venn diagram of patient distribution by sequencing and clinical data"
+
+plot_venn_diagram_samples(tcga_clin, type = "sequencing")
+```
+
+```{r}
+#| label: fig-venn-omics
+#| fig-width: 6
+#| fig-height: 5
+#| fig-cap: "Venn diagram of patient distribution by omics and clinical data"
+
+plot_venn_diagram_samples(tcga_clin, type = "omics")
+```
+
+```{r}
+#| label: tbl-dna-pathway
+#| tbl-cap: "Pathway-level frequencies of DNA alterations"
+
+tcga_pathway %>%
+  dplyr::select(starts_with("genomic_pathway"))%>%
+  tbl_summary(digits = everything()~c(0,0))%>%
+  modify_header(label = "")%>%
+  bold_labels()%>%
+  as_gt()%>%
+  tab_options(quarto.disable_processing = TRUE)
+```
+
+```{r}
+#| label: fig-dna-pathway
+#| fig-width: 12
+#| fig-height: 12
+#| fig-cap: "Pathway-level frequencies of DNA alterations"
+
+plot_dichotomous(tcga_pathway,
+                 var_prefix = "genomic_pathway_",
+                 with_group = FALSE,
+                 xlab = "",
+                 ylab = "Pathway alteration frequency",
+                 process_panel = F)
+```
+
+```{r}
+#| label: tbl-rna-pathway
+#| tbl-cap: "Distribution of RNA-based pathway activity scores"
+
+tcga_pathway %>%
+  dplyr::select(starts_with("hallmark_"))%>%
+  tbl_summary(digits = everything()~c(2,2))%>%
+  modify_header(label = "")%>%
+  bold_labels()%>%
+  as_gt()%>%
+  tab_options(quarto.disable_processing = TRUE)
+```
+
+```{r}
+#| label: fig-rna-pathway
+#| fig-width: 24
+#| fig-height: 20
+#| fig-cap: "Distribution of RNA-based pathway activity scores"
+
+plot_continuous(tcga_pathway,
+                var_prefix = "hallmark_",
+                with_group = FALSE,
+                xlab = "",
+                ylab = "Pathway-activity score",
+                process_panel = T)
+```
+
+Survie sans progression
+
+```{r}
+#| label: fig-pfs-null-model
+#| fig-cap: "Progression-free survival (PFS) curve"
+
+plot_surv(formula      = list(Surv(time, event) ~ 1),
+          data         = tcga_pathway)
+```
+
+```{r}
+#| label: tbl-pfs-null-model
+#| tbl-cap: "Progressiion-free survival rates"
+
+survfit(Surv(time, event) ~ 1, data = tcga_pathway)%>%
+  tbl_survfit(times        = c(12,24,36), 
+              label_header = "**{time} months-PFS rate (95% CI)**",
+              statistic    = "{estimate} [{conf.low}-{conf.high}]")%>%
+  modify_header(label = "")%>%
+  as_gt()%>%
+  tab_options(quarto.disable_processing = TRUE)
+```
+
+# Régression de Cox
+
+Le modèle de Cox [@Cox1972] exprime la fonction de risque instantané d'événement $\lambda$ en fonction du temps $t$ et des covariables $X_{1}, \cdots, X_{n}$ :
+
+$${\displaystyle \lambda \left(t,X_{1},\cdots ,X_{n}\right)=\lambda _{0}\left(t\right)\exp \left(\Sigma _{i=1}^{n}\beta _{i}X_{i}\right)}$$
+Pour un individu, la fonction ${\displaystyle \lambda \left(t,X_{1},\cdots ,X_{n}\right)}$ correspond au risque instantané d'événement à l'instant $t$ sachant qu'il n'a pas encore subi l'événement juste avant $t$.
+${\displaystyle \lambda _{0}\left(t\right)}$ correspond au risque instantané d'événement lorsque toutes les covariables sont nulles. Il s'agit du risque de base.
+
+Le modèle de Cox est dit *semi-paramétrique*. On ne cherche pas à estimer la fonction $\lambda_{0}(t)$ qui est la même pour tous les individus à un instant donné. On s'intéresse au rapport des risques instantanés d'événement pour deux individus exposés à des facteurs de risque différents. Il en découle de cette formule l'hypothèse des risques proportionnels. 
+Soit deux individus $j_{1}$ et $j_{2}$ qui ne diffèrent que par une seule covariable, disons la $k$-ième. On peut imaginer que cette covariable vaut 0 chez $j_{1}$ et 1 chez $j_{2}$. On obtient alors, quel que soit $t$ :
+
+$${\frac {\lambda \left(t,j_{2}\right)}{\lambda \left(t,j_{1}\right)}}={\frac {\lambda _{0}\left(t\right)\exp \left(\beta _{1}X_{1}^{'}+\cdots +\beta _{k-1}X_{k-1}^{'}+\beta _{k}\times 1+\beta _{k+1}X_{k+1}^{'}+\cdots +\beta _{n}X_{n}^{'}\right)}{\lambda _{0}\left(t\right)\exp \left(\beta _{1}X_{1}^{'}+\cdots +\beta _{k-1}X_{k-1}^{'}+\beta _{k}\times 0+\beta _{k+1}X_{k+1}^{'}+\cdots +\beta _{n}X_{n}^{'}\right)}}=\exp \left(\beta _{k}\right)$$
+
+Le rapport est donc indépendant du temps, autrement dit, quel que soit le temps $t$, l'individu $j_{2}$ a un risque instantané d'événement $\exp(\beta _{k})$ fois celui de l'individu $j_{1}$.
+
+L'estimation des coefficients $\beta_{k}|k=1\cdots n$ se fait par la méthode du maximum de vraisemblance proposée par Breslow. La vraisemblance d’un échantillon est en fait la probabilité d’observer cet échantillon, intuitivement donc, on veut maximiser cette probabilité.
+
+Soit :
+
+* $X_{i}$ le vecteur colonne des covariables de la *i*-ème personne 
+* $\beta$ le vecteur colonne des coefficients $\beta_{i}$
+* $t_{i}|i=1\cdots m$ les temps d'événements
+* $d_{i}$ le nombre d'événements au temps $t_{i}$
+* $D_{i}$ l'ensemble des événements au temps $t_{i}$
+* $r_{i}$ le nombre d'individus à risque d'événement au temps $t_{i}^{-}$
+* $R_{i}$ l'ensemble des individus à risque d'événement au temps $t_{i}^{-}$
+
+Au temps $t_{i}$, la probabilité qu'un sujet $k$ subisse l'événement sachant qu'il n'a pas présenté l'événement au temps $t_{i}^{-}$ est :
+$$\lambda _{0}\left(t_{i}\right)\exp \left(X_{k}^{\operatorname {t} }\beta \right)dt$$
+Au temps $t_{i}$, la vraisemblance de l'ensemble des individus appartenant à $D_{i}$ s'écrit alors :
+
+$${\frac {\exp \left(\beta ^{\operatorname {t} }\Sigma _{k\in D_{i}}X_{k}\right)}{\left[\Sigma _{l\in R_{i}}\exp \left(\beta ^{\operatorname {t} }X_{l}\right)\right]^{d_{i}}}}$$
+
+La fonction de vraisemblance (partielle) de Cox s'écrit alors : 
+$$L\left(\beta \right)=\prod _{i=1}^{m}{\frac {\exp \left(\beta ^{\operatorname {t} }\Sigma _{k\in D_{i}}X_{k}\right)}{\left[\Sigma _{l\in R_{i}}\exp \left(\beta ^{\operatorname {t} }X_{l}\right)\right]^{d_{i}}}}$$
+
+Il s’agit donc de résoudre l’équation de sorte que $L\left(\beta \right)$ soit maximale. La valeur $V$ pour laquelle la fonction $L$ atteint son maximum est la vraisemblance de l’échantillon.
+On parle de vraisemblance partielle car seuls les sujets subissant l’événement d'intérêt entrent dans l'estimation de la fonction de vraisemblance, les sujets censurés n’étant considérés qu’indirectement.
+La vraisemblance partielle de Cox est indépendante du risque de base $\lambda_{0}(t)$ et donc de ses paramètres qui ne peuvent alors pas être estimés par cette approche. 
+
+Pour faciliter l'optimisation et le calcul numérique, la log-vraisemblance partielle $l$ (et non la vraisemblance partielle $L$) est utilisée pour estimer les coefficients $\beta$ : 
+
+$$\widehat{\beta} = \underset{\beta}{\mathrm{argmax}} (l(\beta)),$$
+avec $l(\beta)=log(L(\beta))$ la log-vraisemblance partielle.
+
+```{r eval=FALSE}
+#| label: tbl-cox
+#| tbl-cap: "Régression de Cox"
+
+tbl_cox_univ <- tbl_cox(
+  data   = tcga_pathway,
+  time   = "time",
+  event  = "event",
+  covars = c("age_c_f", "figo_c_f", "hpv_negative_f"),
+  model  = "univ"
+)
+
+tbl_cox_multi <- tbl_cox(
+  data   = tcga_pathway,
+  time   = "time",
+  event  = "event",
+  strata = "cohort",
+  covars = c("age_c_f", "figo_c_f", "hpv_negative_f"),
+  model  = "multi"
+)
+
+list(tbl_cox_univ, tbl_cox_multi)%>%
+  tbl_merge(tab_spanner = c("**Univariate Cox regression**",
+                            "**Multivariate Cox regression**"))%>%
+  modify_column_hide(columns = c(stat_n_1_2, stat_nevent_1_2))%>%
+  modify_spanning_header(c(stat_n_1, stat_nevent_1)~NA)%>%
+  as_gt()
+```
+
+# Régression pénalisée de Cox
+
+## *Lasso*
+
+Le programme d'optimisation à résoudre pour la méthode Lasso proposée par Tibshirani [@Tibshirani1997] prend la forme suivante : 
+
+$$
+\widehat{\beta}^{\text{Lasso}}(\lambda)
+= \underset{\beta}{\arg\min} \left( l(\beta) + \lambda \|\beta\|_{1} \right),
+\quad \lambda \geq 0
+$$
+où $l(\beta)$ représente la log-vraisemblance partielle de Cox, $\lambda$ représente le paramètre de régularisation contrôlant l'importance de la pénalisation. 
+La norme $\ell1$, utilisée dans la pénalisation Lasso permet d’assigner des coefficients $\beta$ à 0.
+
+Le paramètre $\lambda$ permettant d'estimer les coefficiens $\beta$ pondère l'influence de la pénalité. Plus $\lambda$ est élevé, plus l'on accorde de l'importance de la pénalisation, et plus les coefficients $\beta$ seront réduits à 0. A l'inverse, si $\lambda=0$, aucune pénalité ne sera appliquée.
+
+Le paramètre $\lambda$ peut être fixé par validation croisée à 5 blocs par la procédure suivante : 
+
+1. Partitionner l'ensemble d'apprentissage en 5 sous-ensembles.
+2. Estimer le vecteur des coefficients $\beta$ en maximisant la vraisemblance partielle avec pénalisation sur 4 sous-ensembles 
+3. Calculer une déviance à partir de la log-vraisemblance partielle totale $l$ en utilisant les 5 sous-ensembles et de la log-vraisemblance partielle $l_{-i}$ calculée à partir des 4 sous-ensembles utilisées précédemment : 
+
+$$\hat{CV}_{i}(\lambda)=l(\beta_{-i}(\lambda))-l_{-i}(\beta_{-i}(\lambda))$$
+4. Recommencer ce procédé à partir de l'étape 3, en enlevant un autre sous-ensemble $i$ et en gardant la même valeur de $\lambda$.
+
+On obtient alors 5 valeurs pour $\widehat{CV}_{i}(\lambda)$, ce qui nous permet de calculer une déviance moyenne (ou erreur moyenne) pour le $\lambda$ considéré : 
+
+$$\hat{CV}(\lambda)=\frac{1}{5} \sum_{i=1}^{5} \hat{CV}_{i}(\lambda)$$
+
+Cette procédure est répétée pour différentes valeurs de $\lambda$¸ en gardant le même partitionnement des patients. Deux heuristiques classiques sont utilisées pour fixer le poids de la pénalisation $\lambda$ :
+
+1. Choisir le paramètre $\lambda$ qui minimise l'erreur moyenne, $\lambda_{min}$
+2. Choisir le plus grand $\lambda$¸ tel que l’erreur moyenne est inférieure à un écart-type de l’erreur moyenne minimale, $\lambda_{1se}$. Cette méthode permet de fixer une valeur de  $\lambda$ plus importante et d'assigner plus de poids à la pénalité. Ainsi, moins de variables seront sélectionnées, et le modèle sera plus parcimonieux. 
+
+```{r}
+time <- tcga_pathway$time
+event <- tcga_pathway$event 
+clin <- c("age","figo","hpv_negative")
+dna_pattern <- "altered_|genomic_pathway_"
+rna_pattern <- "rna_seq_|hallmark_"
+X_names <- tcga_pathway %>% 
+  dplyr::select(all_of(clin),
+                tidyselect::matches(dna_pattern),
+                tidyselect::matches(rna_pattern))%>%
+  colnames()
+X <- tcga_pathway %>% dplyr::select(all_of(X_names))
+
+cox_lasso_fit <- fit_cox_lasso(
+  time  = time,
+  event = event,
+  X     = X,
+  seed  = 123
+)
+```
+
+
+```{r}
+cox_lasso_fit$fit$cv.glmnet
+```
+
+L'erreur d'apprentissage moyenne minimale est atteinte ($min[\hat{CV}(\lambda)]=$ `r round(cox_lasso_fit$fit$cv.glmnet$cvm[cox_lasso_fit$fit$cv.glmnet$index][1], 3)`) lorsque $\lambda_{min}$=`r round(cox_lasso_fit$fit$cv.glmnet$lambda.min, 3)`. Au total, 14 variables sont sélectionnées.
+
+```{r}
+#| label: fig-cv-lasso
+#| fig-cap: "Cross-validation results for standard Lasso regression"
+
+mod = cox_lasso_fit$fit$cv.glmnet$glmnet.fit
+lambda_optimal <- cox_lasso_fit$fit$cv.glmnet$lambda.min 
+lambda_1se <- cox_lasso_fit$fit$cv.glmnet$lambda.1se 
+
+plot(cox_lasso_fit$fit$cv.glmnet, xlab = expression(log~~lambda))
+abline(v = log(lambda_optimal), col = "gray")
+text(log(lambda_optimal)-0.1, 200, bquote(paste(lambda["min"]==.(round(lambda_optimal, 3)))), srt = 90)
+abline(v = log(cox_lasso_fit$fit$cv.glmnet$lambda.1se), col = "gray")
+text(log(lambda_1se)-0.1, 200, bquote(paste(lambda["1se"]==.(round(lambda_1se, 3)))), srt = 90)
+```
+
+```{r}
+#| label: fig-coef-path-lasso
+#| fig-cap: "Coefficient paths for the Lasso Cox model"
+
+betas <- as.vector(coef(mod, s = lambda_optimal))
+beta.clin <- X_names[betas!=0 & X_names %in% clin]
+beta.dna <- X_names[betas!=0 & stringr::str_starts(X_names, dna_pattern)]
+beta.rna <- X_names[betas!=0 & stringr::str_starts(X_names, rna_pattern)]
+
+# get ordered list of variables as they appear at smallest lambda
+allnames <- names(coef(mod)[, ncol(coef(mod))]
+                  [order(coef(mod)[, ncol(coef(mod))], decreasing = TRUE)])
+# assign colors 
+cols <- rep("gray80", length(allnames))
+cols[allnames %in% beta.clin] <- "#0AB329"
+cols[allnames %in% beta.dna] <- "#FF5733"
+cols[allnames %in% beta.rna] <- "#0771A2"
+
+# draw coefficient paths of a Lasso Cox model
+plotmo::plot_glmnet(mod, 
+                    label = FALSE, col = cols,
+                    xlab = expression(log ~ ~lambda), 
+                    ylab = expression(beta),
+                    lwd = 1.5
+)
+abline(v = log(lambda_optimal), col = "gray")
+text(log(lambda_optimal)+0.1, 7, bquote(paste(lambda["min"]==.(round(lambda_optimal, 3)))), srt = 90)
+abline(v = log(cox_lasso_fit$fit$cv.glmnet$lambda.1se), col = "gray")
+text(log(lambda_1se)+0.1, 7, bquote(paste(lambda["1se"]==.(round(lambda_1se, 3)))), srt = 90)
+```
+
+```{r}
+#| label: fig-coef-lasso
+#| fig-width: 9
+#| fig-height: 7
+#| fig-cap: "Coefficient values of selected variables in the Lasso Cox model"
+
+plot_coef(cox_lasso_fit, data_type = T)
+```
+
+## *Group Lasso*
+
+La méthode *Lasso* permettant de sélectionner des variables de manière individuelle a été étendue pour la sélection d'un ensemble de variables contenues dans des groupes définis *a priori* [@Breheny2009; @Breheny2015]. La méthode *Group Lasso* utilise une pénalité sur le groupe permettant la sélection d'un ou de plusieurs groupes en entier.
+
+Supposons que $X = X_{1}, \cdots, X_{G}$ est divisé en $G$ groupes de variables. $X_{G}$ contient $p_{g}$ variables et $\beta_{g}=\beta_{1},\cdots, \beta_{G}$ représentent les coefficients de régression associés à $X = X_{1}, \cdots, X_{G}$.  Le problème d'optimisation à résoudre est le suivant : 
+
+$$
+\widehat{\beta}^{\text{GLasso}}(\lambda)
+= \underset{\beta}{\mathrm{argmin}}
+\left(
+l(\beta) + \lambda \sum_{g=1}^{G} \|\beta_g\|_2
+\right),
+\quad \lambda \ge 0
+$$
+```{r}
+group <- as.factor(
+  dplyr::case_when(
+    X_names %in% clin ~ "Clinical",
+    stringr::str_starts(X_names, dna_pattern) ~ "DNA",
+    stringr::str_starts(X_names, rna_pattern)  ~ "RNA",
+    TRUE ~ NA_character_
+  )
+)
+table(group)
+
+cox_group_lasso_fit <- fit_cox_group_lasso(
+  time  = time,
+  event = event,
+  X     = X,
+  group = group, 
+  seed  = 123
+)
+
+summary(cox_group_lasso_fit$fit$cv.grpsurv)
+```
+
+L'erreur d'apprentissage est minimale ($min[MSE]=$ `r round(min(cox_group_lasso_fit$fit$cv.grpsurv$cve),2)`) lorsque $\lambda=$ `r round(cox_group_lasso_fit$fit$cv.grpsurv$lambda[which.min(cox_group_lasso_fit$fit$cv.grpsurv$cve)],4)`.
+Les 3 groupes (cliniques, DNA et RNA) ont été sélectionnées. 
+
+```{r}
+#| label: fig-cv-group-lasso
+#| fig-cap: "Cross-validation results for Group Lasso regression"
+
+lambda_optimal <- cox_group_lasso_fit$fit$cv.grpsurv$lambda.min
+plot(cox_group_lasso_fit$fit$cv.grpsurv, xlab = expression(log~~lambda))
+abline(v = log(lambda_optimal), col = "gray")
+text(log(lambda_optimal)+0.1, 60, bquote(paste(lambda["min"]==.(round(lambda_optimal, 3)))), srt = 90)
+```
+
+```{r}
+#| label: fig-coef-path-group-lasso
+#| fig-width: 8
+#| fig-height: 8
+#| fig-cap: "Coefficient paths for the Group Lasso Cox model"
+
+lambda_optimal <- cox_group_lasso_fit$fit$cv.grpsurv$lambda.min
+plot(cox_group_lasso_fit$fit$grpsurv, ylab = expression(beta),
+     ylim = c(-20,20), col = c("#0AB329","#FF5733","#0771A2"))
+abline(v = lambda_optimal, col = "gray")
+text(lambda_optimal+0.001, 8, bquote(paste(lambda["min"]==.(round(lambda_optimal, 3)))), srt = 90)
+```
+
+```{r}
+#| label: fig-coef-group-lasso
+#| fig-width: 15
+#| fig-height: 24
+#| fig-cap: "Coefficient values of selected variables in the Group Lasso Cox model"
+
+plot_coef(cox_group_lasso_fit, data_type = T)
+```
+
+## *Priority Lasso*
+
+La régression de Cox utilisant le *priority-Lasso* permet l'ajustement de modèles Lasso successifs pour plusieurs blocs ordonnés de données [@Klau2018]. 
+
+On considère $M$ blocs de variables continues ou binaires qui doivent toutes être pénalisées. 
+Soit $x_{ij}$ la valeur observée de la $j$-ème variable ($j = 1, \cdots, p$) pour le $i$-ème sujet ($i, \cdots, n$). La méthode Lasso standard estime les coeffcient de régression $\beta_{1}, \cdots, \beta_{p}$ des $p$ variables en minimisant l'expression ...
+
+Les observations $p_{m}$ du bloc $m$ pour le sujet $i$ sont désignées par $x^{(m)}_{i1},\cdots,x^{m}_{ip_{m}}$ pour $i=1,\cdots,n$ et $m=1,\cdots,M$. $\beta^{(m)}_{j}$ représentent les coefficients de régression de la $j$ème variable du bloc $m$ avec $j=1,\cdots, p_{m}$ tandis que $\hat{\beta}^{(m)}_{j}$ représente les coefficients de régression estimés. 
+Soit $\pi_{1},\cdots, \pi_{M}$ les indices définissant l'ordre de priorité des blocs $M$ : $\pi_{1}$ désigne l'indice du bloc ayant la priorité la plus élevée tandis que $\pi_{M}$ est l'indice du bloc ayant la priorité la plus faible. 
+
+Dans la première étape de la méthode *Priority-Lasso*, les variables du bloc $\pi_{1}$ sont utilisées pour ajuster le modèle de Cox avec pénalisation Lasso. Les coefficients $\beta^{(\pi_{1})}_{1},\cdots,\beta^{(\pi_{1})}_{p_{\pi_{1}}}$ sont estimés en minimisant 
+
+$$
+\sum_{i=1}^n\left(y_i-\sum_{j=1}^{p_{\pi_1}} x_{i j}^{\left(\pi_1\right)} \beta_j^{\left(\pi_1\right)}\right)^2+\lambda^{\left(\pi_1\right)} \sum_{j=1}^{p_{\pi_1}}\left|\beta_j^{\left(\pi_1\right)}\right| .
+$$
+
+Le prédicteur linéaire ajusté à l'étape 1 est 
+
+$$\hat{\eta}_{1, i}(\pi)=\hat{\beta}_1^{\left(\pi_1\right)} x_{i 1}^{\left(\pi_1\right)}+\ldots+\hat{\beta}_{p_{\pi_1}}^{\left(\pi_1\right)} x_{i p_{\pi_1}}^{\left(\pi_1\right)}.$$
+
+Ce prédicteur linéaire est utilisée comme *offset* dans l'étape suivante au cours de laquelle un nouveau modèle de Cox avec pénalisation Lasso est ajusté pour le bloc $\pi_{2}$.
+
+Dans un premier temps, nous définissons les blocs ainsi que leur ordre de priorité. 
+
+```{r}
+index_clin = which(X_names %in% clin)
+index_dna  = which(stringr::str_starts(X_names, dna_pattern))
+index_rna  = which(stringr::str_starts(X_names, rna_pattern))
+lapply(list(index_clin, index_dna, index_rna), head)
+
+blocks_list <- do.call(.make_blocks_priority_lasso, 
+                       unname(purrr::compact(list(index_clin, 
+                                                  index_dna, 
+                                                  index_rna))))
+str(blocks_list)
+
+blocks_unpen_list <- list(
+  list(bp1 = index_clin, bp2 = index_dna, bp3 = index_rna),
+  list(bp1 = index_clin, bp2 = index_rna, bp3 = index_dna)
+)
+```
+
+La meilleure spécification de blocs sera sélectionnée à l'aide d'une validation croisée. Dans la spécification `blocks_unpen_list`, le bloc clinique est toujours considéré comme le bloc de priorité n°1.
+
+On construit des modèles avec pénalisation du bloc n°1 (`block1_penalisation = TRUE`). 
+```{r}
+cox_priority_lasso_fit <- fit_cox_priority_lasso(
+  time                = time,
+  event               = event,
+  X                   = X,
+  blocks_list         = blocks_list, 
+  block1_penalization = TRUE, 
+  seed                = 123
+)
+```
+
+```{r}
+# Best block specification 
+cox_priority_lasso_fit$fit[["best.blocks"]]
+```
+
+La meilleure spécification est la suivante de blocs : 
+
+1. Clinique 
+2. RNA
+3. DNA 
+
+Valeurs des $\lambda_{min}$ sélectionnés par validation croisée pour chacun des blocs : 
+```{r}
+# Optimal lambda 
+cox_priority_lasso_fit$fit$best.model$lambda.min
+```
+
+Valeurs des erreurs de validation croisée ($min(CVE)$) pour chacun des blocs : 
+
+```{r}
+# min CV error 
+cox_priority_lasso_fit$fit$best.model$min.cvm
+```
+Nombre de variables sélectionnées dans chacun des blocs : 
+
+```{r}
+cox_priority_lasso_fit$fit$best.model$nzero
+```
+
+```{r}
+#| layout-nrow: 3
+#| label: fig-coef-path-priority-lasso
+#| fig-cap: "Coefficient paths for the Priority Lasso Cox model"
+#| fig-subcap:
+#| - "Block 1 - Clinical"
+#| - "Block 2 - RNA"
+#| - "Block 3 - DNA"
+
+cols <- c("#0AB329","#0771A2", "#FF5733")
+best_fit <- cox_priority_lasso_fit$fit$best.model
+for (i in seq_along(best_fit$glmnet.fit)) {
+  
+  betas <- as.vector(coef(best_fit[["glmnet.fit"]][[i]],
+                          s = best_fit[["lambda.min"]][[i]]))
+  beta.select <- which(betas!=0)
+  cols_beta <- rep("gray80", length(betas))
+  cols_beta[beta.select] <- cols[i] 
+
+  plotmo::plot_glmnet(best_fit$glmnet.fit[[i]], 
+                      label = FALSE, col = cols_beta,
+                      xlab = expression(log ~ ~lambda), 
+                      ylab = expression(beta),
+                      lwd = 1.5
+)
+  abline(v = log(best_fit[["lambda.min"]][[i]]), col = "gray")
+text(log(best_fit[["lambda.min"]][[i]]), 0, bquote(paste(lambda["min"]==.(round(best_fit[["lambda.min"]][[i]], 3)))), srt = 90)
+}
+```
+
+```{r}
+#| label: fig-coef-priority-lasso
+#| fig-cap: "Coefficient values of selected variables in the Priority Lasso Cox model"
+
+plot_coef(cox_priority_lasso_fit, data_type = T)
+```
+
+On construit des modèles sans pénalisation du bloc n°1 qui correspond aux variables cliniques (`block1_penalisation = FALSE`). 
+
+```{r}
+cox_priority_lasso_unpen_fit <- fit_cox_priority_lasso(
+  time                = time,
+  event               = event,
+  X                   = X,
+  blocks_list         = blocks_unpen_list, 
+  block1_penalization = FALSE, 
+  seed  = 123
+)
+```
+
+```{r}
+# Best block specification 
+cox_priority_lasso_unpen_fit$fit[["best.blocks"]]
+```
+
+La meilleure spécification est la suivante de blocs : 
+
+1. Clinique 
+2. RNA
+3. DNA 
+
+Valeurs des $\lambda_{min}$ sélectionnés par validation croisée pour chacun des blocs : 
+```{r}
+# Optimal lambda 
+cox_priority_lasso_unpen_fit$fit$best.model$lambda.min
+```
+
+Valeurs des erreurs de validation croisée ($min(CVE)$) pour chacun des blocs : 
+
+```{r}
+# min CV error 
+cox_priority_lasso_unpen_fit$fit$best.model$min.cvm
+```
+
+Nombre de variables sélectionnées dans chacun des blocs : 
+
+```{r}
+cox_priority_lasso_unpen_fit$fit$best.model$nzero
+```
+
+```{r}
+#| layout-nrow: 2
+#| label: fig-coef-path-priority-lasso2
+#| fig-cap: "Coefficient paths for the Priority Lasso Cox model with unpenalized clinical variables"
+#| fig-subcap: 
+#| - "Block 2 - RNA"
+#| - "Block 3 - DNA"
+
+cols <- c("#0AB329","#0771A2", "#FF5733")
+best_fit <- cox_priority_lasso_unpen_fit$fit$best.model
+for (i in 2:length(best_fit$glmnet.fit)) {
+  
+  betas <- as.vector(coef(best_fit[["glmnet.fit"]][[i]],
+                          s = best_fit[["lambda.min"]][[i]]))
+  beta.select <- which(betas!=0)
+  cols_beta <- rep("gray80", length(betas))
+  cols_beta[beta.select] <- cols[i] 
+  
+  plotmo::plot_glmnet(best_fit$glmnet.fit[[i]], 
+                    label = FALSE, col = cols_beta,
+                    xlab = expression(log ~ ~lambda), 
+                    ylab = expression(beta),
+                    lwd = 1.5
+)
+  abline(v = log(best_fit[["lambda.min"]][[i]]), col = "gray")
+  text(log(best_fit[["lambda.min"]][[i]]), 0, bquote(paste(lambda["min"]==.(round(best_fit[["lambda.min"]][[i]], 3)))), srt = 90)
+}
+```
+
+```{r}
+#| label: fig-coef-priority-lasso2
+#| fig-cap: "Coefficient values of selected variables in the Priority Lasso Cox model with unpenalized clinical variables"
+
+plot_coef(cox_priority_lasso_unpen_fit, data_type = T)
+```
+
+
+# *Cox boosting*
+
+L'algorithme de *Cox boosting* [@Binder2008] se présente de la façon suivante : 
+
+Soit $m = 0, \dots, m_{\text{stop}}$ l’indice des itérations de boosting, et $\hat{\beta}^{[m]}$ le vecteur des coefficients à l’itération $m$.
+
+1. **Initialisation**  
+   Initialiser les coefficients à zéro :
+   $$
+   \hat{\beta}^{[0]} = 0
+   $$
+
+2. **Boucle de boosting**  
+   Pour chaque itération $m = 0, \dots, m_{\text{stop}} - 1$ :
+
+   a. **Calcul du gradient (score)**  
+   Calculer le vecteur des dérivées premières de la log-vraisemblance partielle (score) évalué en $\hat{\beta}^{[m]}$.
+
+   b. **Ajustement composante par composante**  
+   Pour chaque variable $j$, ajuster un modèle de base (faible apprenant) en utilisant uniquement la variable $X_j$, en maximisant la log-vraisemblance partielle (ou une approximation quadratique locale).
+
+   c. **Sélection de la meilleure variable**  
+   Identifier la variable $j^*$ qui apporte la plus grande amélioration de la log-vraisemblance (ou du critère de score).
+
+   d. **Mise à jour des coefficients**  
+   Mettre à jour uniquement le coefficient associé à $j^*$ :
+   $$
+   \hat{\beta}_{j^*}^{[m+1]} = \hat{\beta}_{j^*}^{[m]} + \nu \cdot \hat{\gamma}_{j^*}
+   $$
+   où $\nu \in (0,1]$ est le *shrinkage parameter* (pas d’apprentissage) et $\hat{\gamma}_{j^*}$ est l’estimation issue du modèle de base.
+
+   Les autres coefficients restent inchangés :
+   $$
+   \hat{\beta}_{j}^{[m+1]} = \hat{\beta}_{j}^{[m]}, \quad \forall j \neq j^{*}
+   $$
+
+3. **Critère d’arrêt**  
+   Arrêter après $m_{\text{stop}}$ itérations, ce paramètre étant généralement choisi par validation croisée.
+
+::: {.callout-important}
+- Le likelihood-based boosting procède de manière **itérative et parcimonieuse**, en sélectionnant une variable à la fois.
+- Le nombre d’itérations $m_{\text{stop}}$ joue un rôle de **paramètre de régularisation** (analogue au paramètre $\lambda$ du Lasso).
+- Cette approche est particulièrement adaptée aux données de grande dimension et permet une **sélection automatique de variables**.
+- Dans le cas du modèle de Cox, la fonction optimisée est la **log-vraisemblance partielle**.
+:::
+
+Ajustons le modèle sur les données du TCGA en déterminant le nombre optimal d'étapes de boosting ($m_{stop}$) de façon automatique avec une validation croisée à 5 blocs.
+Les variables cliniques ont été incluses dans tous les modèles. 
+
+```{r}
+cox_lboosting_fit <- fit_cox_lboost(
+  time      = time,
+  event     = event, 
+  X         = X,
+  stepno    = 30, 
+  mandatory = clin,
+  nfolds    = 5, 
+  seed      = 123)
+```
+
+::: {.callout-note}
+Dans cet exemple, nous avons limité le boosting à 30 itérations pour éviter des problèmes de convergence.
+:::
+
+```{r}
+summary(cox_lboosting_fit$fit)
+```
+Le nombre optimal d’itérations est de 2, conduisant à la sélection de deux variables omiques en complément des variables cliniques.
+
+```{r}
+#| label: fig-coef-path-cox-lboost
+#| fig-width: 7
+#| fig-height: 6
+#| fig-cap: "Coefficient paths for the CoxBoost model"
+plot_coef_paths(cox_lboosting_fit)
+```
+
+Les trajectoires des coefficients en fonction des étapes de boosting montrent une stabilité globale des effets estimés. Les variables cliniques obligatoires présentent des coefficients relativement constants au cours des itérations, suggérant leur contribution stable au modèle. À l’inverse, les autres variables présentent des variations limitées et restent proches de zéro, indiquant un effet faible ou nul. L’absence de divergence des coefficients confirme par ailleurs la bonne convergence du modèle dans la limite fixée du nombre d’itérations.
+
+Nous pouvons visualiser les mises à jour des coefficients des variables sélectionnées à chaque étape de boosting :  
+
+```{r}
+coef(cox_lboosting_fit$fit, at.step = 0) %>% 
+  subset(names(.) %in% cox_lboosting_fit$var_select)
+```
+
+A l'étape 0, seules les variables cliniques ont un coefficient non nul (absence de pénalisation).
+
+```{r}
+coef(cox_lboosting_fit$fit, at.step = 1) %>% 
+  subset(names(.) %in% cox_lboosting_fit$var_select)
+```
+
+A l'étape 1, la variable `hallmark_kras_signaling_dn` est sélectionnée. 
+
+```{r}
+coef(cox_lboosting_fit$fit, at.step = 2) %>% 
+  subset(names(.) %in% cox_lboosting_fit$var_select)
+```
+
+A l'étape suivante, la variable `hallmark_glycolysis` est sélectionnée et les coefficients des variables cliniques ont été mis à jour. 
+
+```{r}
+#| label: fig-coef-cox-lboost
+#| fig-width: 7
+#| fig-height: 2
+#| fig-cap: "Coefficient values of selected variables in the Cox model with likelihood-based boosting"
+
+plot_coef(cox_lboosting_fit, data_type = T)
+```
+
+<!-- ## *Model-based boosting*  -->
+
+<!-- ```{r} -->
+<!-- cox_mboosting_fit <- fit_cox_mboost( -->
+<!--   time      = time, -->
+<!--   event     = event,  -->
+<!--   X         = X, -->
+<!--   nfolds    = 5, -->
+<!--   seed      = 123) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- summary(cox_mboosting_fit$fit$glmboost) -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- #| label: fig-coef-path-cox-mboost -->
+<!-- #| fig-width: 7 -->
+<!-- #| fig-height: 6 -->
+<!-- #| fig-cap: "Coefficient paths for the Cox model with model-based boosting" -->
+<!-- plot(cox_mboosting_fit$fit$cvrisk) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- #| label: fig-coef-cox-mboost -->
+<!-- #| fig-width: 7 -->
+<!-- #| fig-height: 2 -->
+<!-- #| fig-cap: "Coefficient values of selected variables in the Cox model with model-based boosting" -->
+
+<!-- plot_coef(cox_mboosting_fit, data_type = T) -->
+<!-- ``` -->
+
+# Importance des variables en survie
+
+Le package `survML` comprend des fonctions permettant d’estimer l’importance des variables de manière **agnostique vis-à-vis du modèle et de l’algorithme** (cadre 
+non paramétrique), lorsque la variable d’intérêt est un critère censuré [@Wolock2024]. Cette approche vise à estimer l’**importance intrinsèque des variables**, définie comme le gain prédictif au niveau de la population d’une variable ou d’un groupe de variables.
+
+Supposons que l’on dispose d’un vecteur de variables explicatives $X$, utilisé pour prédire $T$, un temps jusqu’à événement. On note $C$ la variable de censure à droite. Les données observées sont $(X, Y, \Delta)$, où $\Delta := \mathbb{I}(T \leq C)$ et $Y := \min(T, C)$. 
+
+Pour une tâche de prédiction donnée (par exemple, estimer la probabilité que $T$ soit inférieur à un temps $\tau$) et une fonction de prédiction $f$, on note $V(f, P_0)$ la performance prédictive de $f$ sous la distribution $P_0$. On définit $f_{0,X_{-j}}$ comme la fonction de prédiction oracle excluant les variables indexées par $j$, c’est-à-dire la meilleure fonction de prédiction possible (au sens de $V$) utilisant uniquement $X_{-j}$.
+
+Dans ce cadre, l’importance de $X_{j}$ relativement à $X_r$ est définie par :
+
+$$
+\psi_j(P_0) = V(f_{0,X_{r}}, P_0) - V(f_{0,X_{-j}}, P_0)
+$$
+
+Cette quantité correspond à la différence de performance prédictive maximale atteignable lorsque seules les variables de $j$ sont exclues, comparée à celle obtenue lorsque les variables de $j$ sont exclues. Elle constitue la **mesure d’importance des variables (VIM)**. $X_r$ et $X_{-j}$ correspondent respectivement aux groupes de variables « large » (avec les variables indexées par $j$) et « restreint » (après exclusion des variables indexées par $j$).
+
+En présence de censure à droite, l’estimation des VIM nécessite l’estimation des fonctions de survie conditionnelles de $T$ et $C$ sachant $X$ :
+
+$$
+S_0(t \mid x) := P_0(T > t \mid X = x), \quad
+G_0(t \mid x) := P_0(C > t \mid X = x)
+$$
+
+Ces fonctions doivent être estimées sur l’intervalle $(0, \tau]$ à l’aide d’un algorithme d’estimation de survie conditionnelle, tel qu’un modèle de Cox, un modèle paramétrique ou des approches plus flexibles comme le *survival Super Learner* ou le *survival stacking* [@Wolock2024-pp].
+
+Enfin, l’estimation requiert les fonctions de prédiction oracle $f_{0,X}$ et $f_{0,X_{-j}}$ (groupes « large » et « restreint »), dont la forme dépend de la mesure de performance choisie. Pour plusieurs mesures couramment utilisées, ces fonctions peuvent s’exprimer en fonction de $S_0(\cdot \mid x)$.
+
+À titre d’exemple, nous considérons l’estimation de l’importance des variables omiques pour la prédiction de la survie sans progression chez les patients atteints d'un cancer du col de l'utérus, en utilisant les données du TCGA-CESC. 
+
+Dans cette analyse, un Super Learner a été utilisé pour estimer les fonctions de survie conditionnelles ainsi que les fonctions de prédiction. La bibliothèque d’apprenants a été volontairement restreinte à deux algorithmes (`SL.mean` et `SL.ranger`), utilisés avec leurs paramètres par défaut, afin de limiter le coût computationnel.
+
+Dans ce même objectif, le paramètre `bin_size` a été fixé à 0,5. Les paramètres de nuisance ont été estimés par une procédure de cross-fitting à deux blocs, les hyperparamètres étant sélectionnés par validation croisée à deux blocs.
+Nous avons utilisé l'aire sous la courbe ROC cumulative/dynamique dépendante du temps, notée $AUC(t)$ [@Heagerty2005], évaluée sur un horizon temporel prédéfini allant jusqu'à 24 mois ($t \in (0, 24]$). 
+
+Nous avons calculé les estimations ponctuelles des mesures d’importance des variables (VIM) pour toutes les variables d’intérêt ainsi que leurs intervalles de confiance (IC) à 95 %. Des p-values ont également été estimées pour l’hypothèse nulle d’importance nulle, testant si une variable contribue significativement à la prédiction au-delà du bruit aléatoire.
+
+::: {.callout-warning}
+À noter que, pour des analyses complètes, il est recommandé d’utiliser un `bin size` plus faible, une bibliothèque d’apprenants plus riche ainsi qu’un nombre de blocs (folds) d’au moins 5. Ces choix permettent d’améliorer la précision des estimations et la robustesse des résultats.
+:::
+
+## Estimation de l'importance des variables parmi l'ensemble des variables
+
+Dans un premier temps, l’importance de chaque groupe de variables est évaluée relativement à l’ensemble complet des variables. Les variables d’intérêt sont exclues du vecteur complet, et leur importance est quantifiée par la diminution de la performance prédictive induite.
+
+Autrement dit, l'importance d'une variable $X_j$ relativement à $X$ est définie par : 
+
+$$
+\psi_j(P)
+= V\!\left(f_{X}(P),\, P\right)
+- V\!\left(f_{X_{-j}}(P),\, P\right)
+$$
+où $V\big(f_{X}(P), P\big)$ et $V\big(f_{X_{-j}}(P), P\big)$ représentent la performance prédictive optimale basée respectivement sur les fonctions de prédiction utilisant l'ensemble des covariables ($f_{X}$) et sur le vecteur complet de covariables après exclusion des variables $X_j$ ($f_{X_{-j}}$).
+
+```{r}
+input_full <- make_input_vimp_survML_full(
+  data       = tcga_pathway, 
+  var_clin   = clin,
+  dna_prefix = dna_pattern,
+  rna_prefix = rna_pattern
+)
+
+vimp_full_fit <- compute_vimp_survML_full(
+  time           = input_full$time,
+  event          = input_full$event,
+  X              = input_full$X,
+  feature_groups = input_full$feature_groups,
+  SL.library     = c("SL.mean","SL.ranger"), 
+  landmark_times = 24,
+  type           = "AUC", 
+  bin_size       = 0.5,
+  nfolds         = 2,
+  cf_fold_num    = 2,
+  seed           = 123
+)
+```
+
+```{r}
+# VIMs  
+vimp_full_est <- get_vimp_survML_est(vimp_full_fit)
+```
+
+```{r}
+#| label: fig-vimp-full-est-clin
+#| fig-width: 8
+#| fig-height: 3
+#| fig-cap: "Variable importance estimates of clinical features relative to the full feature vector"
+
+vimp_full_est %>%
+  dplyr::filter(variable %in% as.character(var_label(tcga_pathway[,clin])))%>%
+  plot_vimp_survML_est(
+    ylab   = "Variable",
+    type   = "dotplot",
+    limits = c(0, 0.5),
+  )
+```
+
+```{r}
+#| label: fig-vimp-full-est-dna
+#| fig-width: 12
+#| fig-height: 10
+#| fig-cap: "Variable importance estimates of DNA pathways relative to the full feature vector"
+
+vimp_full_est %>%
+  dplyr::filter(data_type == "DNA_pathways")%>%
+  plot_vimp_survML_est(
+    ylab   = "Variable",
+    type   = "dotplot",
+    limits = c(0, 0.5),
+  )
+```
+
+```{r}
+#| label: fig-vimp-full-est-rna
+#| fig-width: 22
+#| fig-height: 15
+#| fig-cap: "Variable importance estimates of RNA pathways relative to the full feature vector"
+
+vimp_full_est %>%
+  dplyr::filter(data_type == "RNA_pathways")%>%
+  plot_vimp_survML_est(
+    ylab   = "",
+    type   = "dotplot",
+    limits = c(0, 0.5),
+  )
+```
+
+## Estimation de l'importance des variables par rapport à un modèle de référence
+
+Nous avons ensuite estimer l'importance des variables omiques par rapport à un 
+modèle de référence constitué uniquement des variables cliniques.
+
+Pour chaque pathway moléculaire ou groupe prédéfini de pathways ($X_j$), la mesure d’importance des variables a été définie relativement à un ensemble de référence de covariables cliniques ($X_{clin}$) dans un cadre non paramétrique. 
+
+Le modèle clinique de référence incluait des facteurs pronostiques établis (âge, stade FIGO et statut HPV), tandis que le modèle étendu incorporait en plus les variables d’intérêt $X_j$ (des modèles étendus distincts ont été considérés pour chaque ensemble de variables).
+
+L’importance intrinsèque de $X_j$ est défini comme le gain de capacité prédictive associé à l’ajout de la variable $X_j$ au modèle clinique :
+
+$$
+\psi_j(P)
+= V\big(f_{(X_{\text{clin}}, X_j)}(P),\, P\big)
+- V\big(f_{X_{\text{clin}}}(P),\, P\big)
+$$
+
+où $V\big(f_{X_{\text{clin}}}(P), P\big)$ et $V\big(f_{(X_{\text{clin}}, X_j)}(P), P\big)$ représentent la performance prédictive optimale basée respectivement sur les fonctions de prédiction utilisant uniquement les covariables cliniques ($f_{X_{\text{clin}}}$) et sur l’ensemble combiné des covariables cliniques et du pathway $X_j$ ($f_{(X_{\text{clin}}, X_j)}$).
+
+```{r}
+input_base <- make_input_vimp_survML_base(
+  data       = tcga_pathway, 
+  var_clin   = clin,
+  dna_prefix = dna_pattern,
+  rna_prefix = rna_pattern
+)
+
+vimp_base_fit <- compute_vimp_survML_base(
+  time           = input_base$time,
+  event          = input_base$event,
+  X              = input_base$X,
+  feature_groups = input_base$feature_groups,
+  base_features  = input_base$base_features, 
+  SL.library     = c("SL.mean","SL.ranger"), 
+  landmark_times = 24,
+  type           = "AUC", 
+  bin_size       = 0.5,
+  nfolds         = 2,
+  cf_fold_num    = 2,
+  seed           = 123
+)
+```
+
+```{r}
+# VIMs  
+vimp_base_est <- get_vimp_survML_est(vimp_base_fit)
+```
+
+```{r}
+#| label: fig-vimp-base-est-dna
+#| fig-width: 12
+#| fig-height: 10
+#| fig-cap: "Variable importance estimates of DNA features relative to the base clinical model"
+
+vimp_base_est %>%
+  dplyr::filter(data_type == "DNA_pathways")%>%
+  plot_vimp_survML_est(
+    ylab   = "Variable",
+    type   = "dotplot",
+    limits = c(0, 0.7),
+  )
+```
+
+```{r}
+#| label: fig-vimp-base-est-rna
+#| fig-width: 22
+#| fig-height: 15
+#| fig-cap: "Variable importance estimates of RNA pathways relative to the base clinical model"
+
+vimp_base_est %>%
+  dplyr::filter(data_type == "RNA_pathways")%>%
+  plot_vimp_survML_est(
+    ylab   = "",
+    type   = "dotplot",
+    limits = c(0, 0.8),
+  )
+```
+
+```{r}
+#| label: fig-vimp-base-est-rna-processes
+#| fig-width: 10
+#| fig-height: 5
+#| fig-cap: "Variable importance estimates of RNA processes relative to the base clinical model"
+
+vimp_base_est %>%
+  dplyr::filter(data_type == "RNA_processes")%>%
+  plot_vimp_survML_est(
+    ylab   = "Variable group",
+    type   = "dotplot",
+    limits = c(0, 0.8),
+  )
+```
+
+# Références 
+
+::: {#refs}
+:::
+
+# R session info 
+
+```{r}
+sessionInfo()
+```
+
