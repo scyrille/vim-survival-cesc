@@ -25,11 +25,14 @@ outputs/
 # ======================
 # Documents
 # ======================
-docs/
+docs/*
+!docs/tutoriel_atelier_EPICLIN_2026.html
 
 # =========================
-# Quarto / RMarkdown
+# Report sources
 # =========================
+
+report_sources/
 *_files/
 *.knit.md
 *.utf8.md
