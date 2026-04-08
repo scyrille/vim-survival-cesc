@@ -1,10 +1,45 @@
 project:
   type: website
   output-dir: docs
+  render:
+    - tutorial/tutoriel_survival_tcga_cesc.qmd
+  execute-dir: project
 
 website:
-  title: "Tutoriel sur les méthodes avancées d'analyse de survie en contexte multi-omique: Lasso, boosting et importance des variables"
-  navbar:
-    left:
-      - href: report_sources/tutoriel_atelier_EPICLIN_2026.qmd
-        text: Tutoriel
+  page-navigation: true
+  title: "Tutoriel sur l'analyse de survie"
+  # repo-url: https://github.com/scyrille/survival-vim-cesc
+  # repo-actions: [source, issue]
+  
+  # navbar:
+  #   # background: light
+  #   search: true
+  #   collapse-below: sm
+  #   left:
+  #     - href: tutorial/tutoriel_survival_tcga_cesc.qmd
+  #       text: "Introduction"
+  #     - href: tutoriel_survival_tcga_cesc.qmd
+  #       text: "Analyse"
+        
+format:
+  html:
+    # theme:
+    #   light: default
+    #   dark: [default, theme-dark.scss]
+    toc: true
+    # toc-depth: 4
+#     # appendix-style: none
+# execute:
+#   message: false
+#   warning: false
+bibliography: "references.bib"
+#     fig-align: "center"
+#     fig-cap-location: top
+#     fig-format: png
+#     html-math-method: mathml
+#     link-citations: true
+#     lang: fr
+#     # language: 
+#     #   title-block-published: "UPDATED"
+#     page-layout: full
+    
