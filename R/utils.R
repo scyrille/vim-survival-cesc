@@ -17,8 +17,6 @@ library(purrr)
 library(readxl)
 library(TCGAbiolinks)
 library(ggVennDiagram)
-library(quarto)
-library(rmarkdown)
 
 # Data import and export helpers ------------------------------------------
 
@@ -695,54 +693,4 @@ plot_venn_diagram_samples <- function(df, type) {
     ggplot2::coord_cartesian(clip = "off")
   
   p
-}
-
-# Reporting ---------------------------------------------------------------
-
-#' Render a Quarto document
-#'
-#' This function renders a Quarto (`.qmd`) document and optionally renames
-#' the generated output file.
-#'
-#' @param input_file A character string specifying the path to the input
-#'   Quarto file (`.qmd`).
-#'
-#' @param output_file A character string specifying the desired output file
-#'   name (including extension, e.g., `"report.html"`). If `NULL`, the default
-#'   Quarto output name is kept.
-#'
-#' @return Invisibly returns the path to the rendered file.
-
-#' @export
-render_quarto_docs <- function(input_file, output_file){
-  
-  quarto::quarto_render(input = input_file)
-  
-  input_format <- tools::file_ext(input_file)
-  output_format <- tools::file_ext(output_file)
-  
-  file.rename(from = gsub(input_format, output_format, input_file), 
-              to = output_file)
-}
-
-#' Render an R Markdown document
-#'
-#' This function renders an R Markdown (`.Rmd`) document to a specified
-#' output directory and file name.
-#'
-#' @param input_file A character string specifying the path to the input
-#'   R Markdown file (`.Rmd`).
-#'
-#' @param output_dir A character string specifying the output directory.
-#'
-#' @param output_file A character string specifying the output file name
-#'   (including extension, e.g., `"report.html"`).
-#'
-#' @return Invisibly returns the path to the rendered file.
-#'
-#' @export
-render_rmarkdown_docs <- function(input_file, output_dir, ouput_file){
-  rmarkdown::render(input = input_file, 
-                    output_dir = output_dir, 
-                    output_file = output_file)
 }
