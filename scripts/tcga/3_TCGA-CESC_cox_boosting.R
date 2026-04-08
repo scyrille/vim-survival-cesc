@@ -22,8 +22,8 @@ tcga <- read_processed(cohort = "tcga")%>%
                           ))]}
 
 clin <- c("age","figo","hpv_negative")
-dna_pattern <- "altered_|genomic_pathway_"
-rna_pattern <- "rna_seq_|hallmark_"
+dna_pattern <- "genomic_pathway_"
+rna_pattern <- "hallmark_"
 
 X_names <- tcga %>% 
   purrr::map(~.x %>% 
@@ -59,6 +59,7 @@ cox_lboost_fit <- tcga %>%
       event     = .x$event,
       X         = .x %>% dplyr::select(all_of(X_names[[.y]])),
       mandatory = c("age", "figo", "hpv_negative"),
+      stepno    = 30,    
       seed      = 123
     )#,
     # .options = furrr::furrr_options(
