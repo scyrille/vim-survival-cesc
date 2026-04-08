@@ -1,0 +1,10 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Tutoriel sur les méthodes avancées d'analyse de survie en contexte multi-omique: Lasso, boosting et importance des variables"
+  navbar:
+    left:
+      - href: reports_sources/tutoriel_atelier_EPICLIN_2026.qmd
+        text: Tutoriel
