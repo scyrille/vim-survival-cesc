@@ -169,14 +169,14 @@ plot_surv <- function(formula,
 #'   results across strata.
 #'
 #' @export
-tbl_cox_strata <- function(data,
-                           time,
-                           event,
-                           strata,
-                           covars,
-                           model = c("univ", "multi"),
-                           exponentiate = TRUE,
-                           tidy_fun = broom.helpers::tidy_parameters) {
+tbl_cox <- function(data,
+                    time,
+                    event,
+                    strata = NULL,
+                    covars,
+                    model = c("univ", "multi"),
+                    exponentiate = TRUE,
+                    tidy_fun = broom.helpers::tidy_parameters) {
   model <- match.arg(model)
   
   df <- data %>%
@@ -214,21 +214,36 @@ tbl_cox_strata <- function(data,
     }
   }
   
-  df %>%
-    gtsummary::tbl_strata(
-      strata = !!strata,
-      .tbl_fun = ~ .tbl_fun(.x) %>%
-        gtsummary::bold_labels() %>%
-        gtsummary::add_global_p() %>%
-        gtsummary::add_nevent(location = "level") %>%
-        gtsummary::add_n(location = "level") %>%
-        gtsummary::modify_column_merge(
-          pattern = "{estimate} [{conf.low} - {conf.high}]",
-          rows = !is.na(estimate)
-        ) %>%
-        gtsummary::modify_header(label = "", estimate = "**HR [95% CI]**") %>%
-        gtsummary::bold_p(t = 0.05)
-    )
+  if (!is.null(strata)) {
+    df %>%
+      gtsummary::tbl_strata(
+        strata = !!strata,
+        .tbl_fun = ~ .tbl_fun(.x) %>%
+          gtsummary::bold_labels() %>%
+          gtsummary::add_global_p() %>%
+          gtsummary::add_nevent(location = "level") %>%
+          gtsummary::add_n(location = "level") %>%
+          gtsummary::modify_column_merge(
+            pattern = "{estimate} [{conf.low} - {conf.high}]",
+            rows = !is.na(estimate)
+          ) %>%
+          gtsummary::modify_header(label = "", estimate = "**HR [95% CI]**") %>%
+          gtsummary::bold_p(t = 0.05)
+      )
+  } else {
+    df %>% 
+      .tbl_fun() %>%
+      gtsummary::bold_labels() %>%
+      gtsummary::add_global_p() %>%
+      gtsummary::add_nevent(location = "level") %>%
+      gtsummary::add_n(location = "level") %>%
+      gtsummary::modify_column_merge(
+        pattern = "{estimate} [{conf.low} - {conf.high}]",
+        rows = !is.na(estimate)
+      ) %>%
+      gtsummary::modify_header(label = "", estimate = "**HR [95% CI]**") %>%
+      gtsummary::bold_p(t = 0.05)
+  }
 }
 
 
