@@ -13,11 +13,13 @@ library(dplyr)
 library(stringr)
 library(gt)
 library(ggplot2)
-library(geomtextpath)
-library(patchwork)
+library(egg)
 library(survival)  
 library(survML)  
 library(SuperLearner)
+library(glmnet)
+library(ranger)
+library(xgboost)
 
 # ------------------------------ Functions ---------------------------------#
 
@@ -796,16 +798,16 @@ get_top10_vimp_survML <- function(vims){
       variable =  md("**Pathway**"), 
       est_ci =  md("**VIM [95% CI]**"),
       p = md("**p-value**"))%>%
-    tab_style_body(style = cell_text(weight = "bold"),
-                   columns = p,
-                   fn = function(x) x < 0.05)%>%
-    fmt(columns = p, 
-        fns = function(x) ifelse(
-          x < 0.05, formatC(x, format = "f", digits = 3),
-          ifelse(x < 0.001, "<0.001",
-                 formatC(x, format = "f", digits = 2))))%>%
-    tab_style(style = cell_text(weight = "bold"),
-              locations = cells_body(columns = variable))
+    gt::tab_style_body(style = cell_text(weight = "bold"),
+                       columns = p,
+                       fn = function(x) x < 0.05)%>%
+    gt::fmt(columns = p, 
+            fns = function(x) ifelse(
+              x < 0.05, formatC(x, format = "f", digits = 3),
+              ifelse(x < 0.001, "<0.001",
+                     formatC(x, format = "f", digits = 2))))%>%
+    gt::tab_style(style = cell_text(weight = "bold"),
+                  locations = cells_body(columns = variable))
 }
 
 
