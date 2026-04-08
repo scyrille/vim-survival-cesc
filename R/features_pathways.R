@@ -14,6 +14,8 @@ library(tibble)
 library(stringr)
 library(labelled)
 library(janitor)
+library(ggplot2)
+library(ggplotify)
 library(gtsummary)
 library(msigdbr)   
 library(DESeq2)   
@@ -752,21 +754,29 @@ plot_dichotomous <- function(df,
 #' @export
 plot_cor_continuous <- function(df, var_prefix = "hallmark_") {
 
+  pattern <- paste0("^(", gsub("\\|", "|", var_prefix), ")")
+  
   data <- df %>%
-    dplyr::select(dplyr::starts_with(unlist(strsplit(var_prefix, split = "[|]"))))
-
+    dplyr::select(matches(pattern))
+  
   colnames(data) <- var_label(data, unlist = TRUE)
-
-  plot <- ggplotify::as.ggplot(~corrplot::corrplot(
-    cor(data),
-    method = "color",
-    type = "lower",
-    tl.cex = 0.5,
-    tl.col = "grey30",
-    diag = FALSE
-  ))
-
-  plot
+  
+  cor(as.matrix(data), use = "pairwise.complete.obs")%>%
+    as.table()%>%
+    as.data.frame()%>%
+    mutate(Freq = ifelse(Var1==Var2, NA, Freq))%>%
+    {
+      ggplot(., aes(Var1, Var2, fill = Freq)) +
+        geom_tile(color = "white") +
+        scale_fill_gradient2(low = "#2166AC", mid = "white", high = "#B2182B",
+                             midpoint = 0, limits = c(-1,1))+
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1),
+              panel.grid = element_blank(),
+              legend.position = "top", 
+              legend.direction = "horizontal") +
+        labs(fill = NULL, x = NULL, y = NULL)
+    }
 }
 
 #' Pairwise Fisher's exact tests with heatmap visualization
