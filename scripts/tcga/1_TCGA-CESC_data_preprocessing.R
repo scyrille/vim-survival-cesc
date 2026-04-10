@@ -1,5 +1,5 @@
 
-#'@description Data preprocessing
+#'@description Data preprocessing (optional) 
 
 library(here)
 
@@ -11,9 +11,9 @@ source(here::here("R","features_pathways.R"))
 
 # Import data -------------------------------------------------------------
 
-## Download TCGA-CESC data (optional) 
-# tcga_raw <- import_tcga(raw_dir = "data/raw/tcga", download = TRUE)
-# saveRDS(tcga_raw, here::here("data/raw/tcga/tcga_raw_data.RDS"))
+## Download TCGA-CESC data 
+tcga_raw <- import_tcga(raw_dir = "data/raw/tcga", download = TRUE)
+saveRDS(tcga_raw, here::here("data/raw/tcga/tcga_raw_data.RDS"))
 
 # Prepare clinical data  --------------------------------------------------
 
