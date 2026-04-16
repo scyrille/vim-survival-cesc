@@ -196,7 +196,10 @@ tbl_cox_mboost <- cox_mboost_fit %>%
 ## Bio-RAIDs only 
 
 
-# VIM relative to clinical features ---------------------------------------
+
+# VIM relative to base model ----------------------------------------------
+
+## Parallel analysis across cohorts ----
 
 # Load all results 
 vimp_survML_base_fit <- cohorts %>%
@@ -212,47 +215,58 @@ vimp_survML_base_est <- vimp_survML_base_fit %>%
 # Plots of VIMs
 vimp_survML_base_est_bind <- vimp_survML_base_est %>%
   bind_rows()%>%
-  group_split_custom(data_type, landmark_time)
-# width <- set_names(rep(10, 9), names(vimp_survML_base_est))
-# height <- set_names(c(rep(10,3), rep(20,3), rep(6,3)),
-#                     names(vimp_survML_base_est))
-width <- set_names(c(12,23,9), names(vimp_survML_base_est_bind))
-height <- set_names(c(12,20,5), names(vimp_survML_base_est_bind))
-# ylab <- set_names(names(vimp_survML_base_est_bind) %>%
-#   stringr::str_replace_all(c("DNA_"="DNA-based ",
-#                              "RNA_"="RNA-based "))%>%
-#   gsub(paste0("_",c(12,24,36), collapse = "|"), "", .), 
-#   names(vimp_survML_base_est_bind))
+  group_split(data_type, landmark_time)%>%
+  set_names(c("dna_pathways_24","dna_processes_24",
+              "rna_pathways_24","rna_processes_24"))
+width <- set_names(c(20,9,23,9), names(vimp_survML_base_est_bind))
+height <- set_names(c(15,5,20,5), names(vimp_survML_base_est_bind))
+process_panel <- set_names(c(T,F,T,F), names(vimp_survML_base_est_bind))
 
 vimp_survML_base_est_bind %>%
   purrr::imap(~ plot_vimp_survML_est(
     .x,
-    # xlab = "", 
     ylab   = "",
     type   = "barplot",
+    process_panel = process_panel[.y], 
     fill_by = "cohort",
     fill_label = ""
   )) %>%
   purrr::iwalk(~ save_plot(.x, here::here("outputs","figures"),
-                           paste0("compare_barplot_surv_vimp_base_est_", .y),
+                           paste0("compare_barplot_surv_vimp_base_est_", .y,
+                                  "_panel"),
                            width[.y], height[.y]))
+
+list.files(here::here("outputs/figures"), 
+           pattern = "^compare_barplot_surv_vimp_base_est_.*panel\\.pdf$", 
+           full.names = T)%>%
+  sort()%>%
+  purrr::iwalk(~{
+    new_name <- file.path(here::here("docs/articles", 
+                                     "computers_in_biology_and_medicine"), 
+                          paste0("Figure_", .y+1, ".pdf"))
+    file.copy(.x, new_name, overwrite = TRUE)
+  })
 
 vimp_survML_base_est_bind %>%
   purrr::imap(~ plot_vimp_survML_est(
     .x,
     ylab   = "",
+    process_panel = process_panel[.y], 
     type   = "dotplot",
     fill_by = "cohort",
     fill_label = ""
   )) %>%
   purrr::iwalk(~ save_plot(.x, here::here("outputs","figures"),
-                           paste0("compare_dotplot_surv_vimp_base_est_", .y),
+                           paste0("compare_dotplot_surv_vimp_base_est_", .y, 
+                                  "_panel"),
                            width[.y], height[.y]))
 
 # Tables of VIMs
 tbl_vimp_survML_base <- vimp_survML_base_est %>%
   purrr::map(~.x %>% 
-        group_split_custom(data_type, landmark_time)%>%
+               group_split(data_type, landmark_time)%>%
+               set_names(c("dna_pathways_24","dna_processes_24",
+                           "rna_pathways_24","rna_processes_24"))%>%
         purrr::map(~tbl_vimp_survML(.x)))
 
 # Scatter plot with Spearman correlation 
@@ -264,14 +278,103 @@ vimp_survML_base_est %>%
 
 # Top-10 ranked pathways 
 tbl_vimp_survML_base_top10 <-  vimp_survML_base_est %>%
-  map(~.x %>%
-        # dplyr::filter(!grepl("RNA_processes", data_type))%>%
-        group_split_custom(data_type, landmark_time)%>%
-        map(~get_top10_vimp_survML(.x)))
+  purrr::map(~.x %>%
+               group_split(data_type, landmark_time)%>%
+               set_names(c("dna_pathways_24","dna_processes_24",
+                           "rna_pathways_24","rna_processes_24"))%>%
+               purrr::map(~get_top10_vimp_survML(.x)))
 
 # Overlap of top-10 ranked pathways 
 tbl_vimp_survML_base_top10_overlap <- vimp_survML_base_est %>%
   get_overlap_top10_vimp_survML()
+
+## Pooled analysis ----
+
+# Load all results
+combined_vimp_survML_base_fit <- readRDS(
+  here::here("outputs/results/combined_vimp_survML_base_fit.rds"))
+
+# VIMs  
+combined_vimp_survML_base_est <- combined_vimp_survML_base_fit %>%
+  purrr::map(~get_vimp_survML_est(.x))
+
+# Plots of VIMs
+combined_vimp_survML_base_est_split <- combined_vimp_survML_base_est %>%
+  purrr::map(
+    ~.x %>% 
+      group_split(data_type, landmark_time)%>%
+      set_names(c("dna_pathways_24","dna_processes_24",
+                  "rna_pathways_24","rna_processes_24"))
+  )%>%
+  purrr::list_flatten()
+
+width <- set_names(rep(c(23,9,23,9),2), 
+                   names(combined_vimp_survML_base_est_split))
+height <- set_names(rep(c(15,5,20,5),2), 
+                    names(combined_vimp_survML_base_est_split))
+process_panel <- set_names(rep(c(T,F,T,F),2), 
+                           names(combined_vimp_survML_base_est_split))
+
+combined_vimp_survML_base_est_split %>%
+  purrr::imap(
+    ~ plot_vimp_survML_est(
+      .x,
+      ylab   = "",
+      process_panel = process_panel[.y],
+      type   = "barplot"
+      )
+    )%>%
+  purrr::iwalk(
+    ~ save_plot(
+      .x, here::here("outputs","figures"),
+      janitor::make_clean_names(
+        paste0("combined_barplot_surv_vimp_base_est_figo_", .y)
+        ),
+      width[.y], height[.y]
+      )
+    )
+
+list.files(here::here("outputs/figures"), 
+           pattern = "^combined_barplot_surv_vimp_base_est_figo_i_ii.*\\.pdf$", 
+           full.names = T)%>%
+  sort()%>%
+  purrr::iwalk(~{
+    new_name <- file.path(here::here("docs/articles", 
+                                     "computers_in_biology_and_medicine"), 
+                          paste0("Supplementary_Figure_S", .y+3, ".pdf"))
+    file.copy(.x, new_name, overwrite = TRUE)
+  })
+
+combined_vimp_survML_base_est_split %>%
+  purrr::imap(
+    ~ plot_vimp_survML_est(
+      .x,
+      ylab   = "",
+      process_panel = process_panel[.y],
+      type   = "dotplot"
+    )
+  )%>%
+  purrr::iwalk(
+    ~ save_plot(
+      .x, here::here("outputs","figures"),
+      janitor::make_clean_names(
+        paste0("combined_dotplot_surv_vimp_base_est_figo_", .y)
+      ),
+      width[.y], height[.y]
+    )
+  )
+
+# Tables of VIMs
+tbl_combined_vimp_survML_base <- combined_vimp_survML_base_est_split %>%
+  purrr::map(~tbl_vimp_survML(.x))
+
+# Top-10 ranked pathways 
+tbl_combined_vimp_survML_base_top10 <-  combined_vimp_survML_base_est %>%
+  purrr::map(~.x %>%
+               group_split(data_type, landmark_time)%>%
+               set_names(c("dna_pathways_24","dna_processes_24",
+                           "rna_pathways_24","rna_processes_24"))%>%
+               purrr::map(~get_top10_vimp_survML(.x)))
 
 
 # ---------------------------- Save all tables --------------------------#
