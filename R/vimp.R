@@ -13,6 +13,7 @@ library(dplyr)
 library(stringr)
 library(gt)
 library(ggplot2)
+library(geomtextpath)
 library(egg)
 library(survival)  
 library(survML)  
@@ -363,15 +364,28 @@ make_input_vimp_survML_base <- function(data,
     set_names(var_label(X %>% dplyr::select(-all_of(var_clin)),
                         unlist = T))
   
-  group_pathway_features <- get_pathways_process() %>%
-    dplyr::filter(data_type == "RNA_pathways") %>%
-    dplyr::transmute(process, variable = tolower(variable)) %>%
+  group_DNA_pathway_features <- get_pathways_process() %>%
+    dplyr::filter(data_type == "DNA_pathways") %>%
+    dplyr::select(process, variable) %>%
+    dplyr::transmute(process = paste0(process, " (DNA)"), variable) %>%
     dplyr::group_by(process) %>%
     dplyr::summarise(variable = list(variable), .groups = "drop") %>%
     tibble::deframe()%>%
-    purrr::imap_chr(~paste(which(names(X) %in% .x), collapse = ",")
+    purrr::imap_chr(~paste(which(as.character(var_label(X)) %in% .x), collapse = ",")
+    )
+  
+  group_RNA_pathway_features <- get_pathways_process() %>%
+    dplyr::filter(data_type == "RNA_pathways") %>%
+    dplyr::transmute(process = paste0(process, " (RNA)"), variable) %>%
+    dplyr::group_by(process) %>%
+    dplyr::summarise(variable = list(variable), .groups = "drop") %>%
+    tibble::deframe()%>%
+    purrr::imap_chr(~paste(which(as.character(var_label(X)) %in% .x), collapse = ",")
   )
-  feature_groups <- c(pathway_features, group_pathway_features)
+  
+  feature_groups <- c(pathway_features, 
+                      group_DNA_pathway_features,
+                      group_RNA_pathway_features)
   
   list(time = data$time,
        event = data$event,
@@ -383,13 +397,18 @@ make_input_vimp_survML_base <- function(data,
 # Plotting and table helpers ----------------------------------------------
 
 #' Get the variable importance estimates.
-#'@param compute_vimp The object returned by compute_vimp_*()
+#'@param vims The object returned by compute_vimp_*()
 
-get_vimp_survML_est <- function(compute_vimp){
-  do.call(rbind, lapply(compute_vimp, function(x) x$result))%>%
+get_vimp_survML_est <- function(vims){
+  do.call(rbind, lapply(vims, function(x) x$result))%>%
     {rownames(.) <- NULL; .}%>%
     left_join(get_pathways_process(), by = "variable")%>%
-    mutate(data_type = ifelse(is.na(data_type), "RNA_processes", data_type))
+    mutate(data_type = case_when(grepl("\\(DNA\\)", variable)~"DNA_processes",
+                                 grepl("\\(RNA\\)", variable)~"RNA_processes",
+                                 TRUE~data_type),
+           variable = gsub(" \\(DNA\\)| \\(RNA\\)", "", variable),
+           label = ifelse(is.na(label), variable, label)) %>%
+    dplyr::filter(!is.na(data_type))
 }
 
 ## Plot VIM estimates
@@ -397,6 +416,7 @@ plot_vimp_survML_est <- function(vims,
                                  xlab = "VIM ± 95% CI",
                                  ylab = "Variable",
                                  type = c("barplot", "dotplot"),
+                                 process_panel = F, 
                                  fill_by = NULL,         
                                  fill_values = NULL,      
                                  fill_label = NULL,
@@ -405,7 +425,7 @@ plot_vimp_survML_est <- function(vims,
                                  vline_color = "red",
                                  vline_linetype = "dotted",
                                  vline_linewidth = 0.7,
-                                 limits = c(0, 0.4),
+                                 limits = c(0, 0.5),
                                  legend.position = "top",
                                  legend.direction = "horizontal") {
   
@@ -414,8 +434,8 @@ plot_vimp_survML_est <- function(vims,
   df <- vims %>%
     # dplyr::arrange(dplyr::desc(est)) %>%
     dplyr::mutate(
-      # ord_group = forcats::fct_reorder(variable, est),
-      ord_group = as.factor(variable),
+      # ord_group = forcats::fct_reorder(label, est),
+      ord_group = as.factor(label),
       est_lab = paste0(
         format(round(est, 2), nsmall = 2), " [",
         format(round(cil, 2), nsmall = 2), "-",
@@ -424,12 +444,6 @@ plot_vimp_survML_est <- function(vims,
       ),
       p_val = gtools::stars.pval(p)
     )
-  
-  df_p1 <- df %>% filter(process %in% c("Cellular component",
-                                        "DNA damage", "Pathway"))
-  df_p2 <- df %>% filter(process %in% c("Proliferation","Development"))
-  df_p3 <- df %>% filter(process %in% c("Metabolic","Immune"))
-  df_p4 <- df %>% filter(process %in% c("Signaling"))
   
   # Default fill handling
   if (is.null(fill_by)) {
@@ -579,82 +593,61 @@ plot_vimp_survML_est <- function(vims,
   
     base_theme(plot, legend.position, legend.direction)
   }
-
-  if (type == "dotplot" & unique(vims$data_type)!="RNA_pathways") {
-    
-    plot <- .dotplot_vimp(df, xlab, ylab, aes_fill, fill_values,
-                          p_text_color, vline0, 
-                          legend.position = legend.position, 
-                          legend.direction = legend.direction)
-    
-  } else if (type == "dotplot" & unique(vims$data_type)=="RNA_pathways")  {
-    
-    p1 <- .dotplot_vimp(df_p1, xlab, ylab, aes_fill, fill_values,
-                        p_text_color, vline0,
-                        facet = T, nrow = 3, ncol = 1,
-                        legend.position = legend.position, 
-                        legend.direction = legend.direction)+
-      theme(axis.title.x = element_blank(),
-            axis.text.x = element_blank())
-    p2 <- .dotplot_vimp(df_p2, xlab, ylab, aes_fill, fill_values,
-                        p_text_color, vline0,
-                        facet = T, nrow = 2, ncol = 1,
-                        legend.position = "none", 
-                        legend.direction = legend.direction)+
-      theme(axis.title.x = element_blank(),
-            axis.text.x = element_blank())
-    p3 <- .dotplot_vimp(df_p3, xlab, ylab, aes_fill, fill_values,
-                        p_text_color, vline0,
-                        facet = T, nrow = 2, ncol = 1,
-                        legend.position = "none", 
-                        legend.direction = legend.direction)
-    p4 <- .dotplot_vimp(df_p4, xlab, ylab, aes_fill, fill_values,
-                        p_text_color, vline0,
-                        facet = T, nrow = 1, ncol = 1,
-                        legend.position = "none", 
-                        legend.direction = legend.direction)
-    
-    plot <- egg::ggarrange(p1, p2, p3, p4,
-                           ncol = 2, nrow = 2,
-                           widths = c(1, 1), heights = c(1, 1))
-    
-  } else if (type == "barplot"  & unique(vims$data_type)!="RNA_pathways") { 
-    
-    plot <- .barplot_vimp(df, xlab, ylab, aes_fill, fill_values, 
-                          p_text_color, vline0, 
-                          facet = F, nrow = NULL, ncol = NULL, 
-                          legend.position, legend.direction) 
-
-  } else if (type == "barplot"  & unique(vims$data_type)=="RNA_pathways"){
   
-    p1 <- .barplot_vimp(df_p1, xlab, ylab, aes_fill, fill_values,
-                        p_text_color, vline0,
-                        facet = T, nrow = 3, ncol = 1,
-                        legend.position = legend.position, legend.direction)+
-      theme(axis.title.x = element_blank(),
-            axis.text.x = element_blank())
-    p2 <- .barplot_vimp(df_p2, xlab, ylab, aes_fill, fill_values,
-                        p_text_color, vline0,
-                        facet = T, nrow = 2, ncol = 1,
-                        legend.position = "none", legend.direction)+
-      theme(axis.title.x = element_blank(),
-            axis.text.x = element_blank())
-    p3 <- .barplot_vimp(df_p3, xlab, ylab, aes_fill, fill_values,
-                        p_text_color, vline0,
-                        facet = T, nrow = 2, ncol = 1,
-                        legend.position = "none", legend.direction)
-    p4 <- .barplot_vimp(df_p4, xlab, ylab, aes_fill, fill_values,
-                        p_text_color, vline0,
-                        facet = T, nrow = 1, ncol = 1,
-                        legend.position = "none", legend.direction)
-    
-    plot <- egg::ggarrange(p1, p2, p3, p4,
-                           ncol = 2, nrow = 2,
-                           widths = c(1, 1), heights = c(1, 1))
+  if (type == "dotplot") {
+    fun = .dotplot_vimp
+  } else if (type == "barplot") {
+    fun = .barplot_vimp
   }
   
+  if (process_panel){
+    
+    df_p1 <- df %>% filter(process %in% c("Cellular component",
+                                          "DNA damage", "Pathway"))
+    df_p2 <- df %>% filter(process %in% c("Proliferation","Development",
+                                          "Epigenetics"))
+    df_p3 <- df %>% filter(process %in% c("Metabolic","Immune"))
+    df_p4 <- df %>% filter(process %in% c("Signaling"))
+    
+    p1 <- fun(df_p1, xlab, ylab, aes_fill, fill_values,
+              p_text_color, vline0,
+              facet = T, nrow = 3, ncol = 1,
+              legend.position = legend.position, 
+              legend.direction = legend.direction)+
+      theme(axis.title.x = element_blank(),
+            axis.text.x = element_blank())
+    p2 <- fun(df_p2, xlab, ylab, aes_fill, fill_values,
+              p_text_color, vline0,
+              facet = T, nrow = 2, ncol = 1,
+              legend.position = "none", 
+              legend.direction = legend.direction)+
+      theme(axis.title.x = element_blank(),
+            axis.text.x = element_blank())
+    p3 <- fun(df_p3, xlab, ylab, aes_fill, fill_values,
+              p_text_color, vline0,
+              facet = T, nrow = 2, ncol = 1,
+              legend.position = "none", 
+              legend.direction = legend.direction)
+    p4 <- fun(df_p4, xlab, ylab, aes_fill, fill_values,
+              p_text_color, vline0,
+              facet = T, nrow = 1, ncol = 1,
+              legend.position = "none", 
+              legend.direction = legend.direction)
+    
+    plot <- egg::ggarrange(p1, p2, p3, p4,
+                           ncol = 2, nrow = 2,
+                           widths = c(1, 1), heights = c(1, 1))
+    
+  } else {
+    
+    plot <- fun(df = df, xlab = xlab, ylab = ylab, 
+                aes_fill = aes_fill, fill_values = fill_values,
+                p_text_color = p_text_color, vline0 = vline0, 
+                facet = F, nrow = NULL, ncol = NULL, 
+                legend.position = legend.position, 
+                legend.direction = legend.direction)
+  }
   plot
-  
 }
 
 ## Summary table of VIM estimates.
@@ -669,12 +662,12 @@ tbl_vimp_survML <- function(vims){
                     format(round(ciu, 3), nsmall = 3), "]"),
       across(c(large_predictiveness, small_predictiveness), 
              ~format(round(.x , 2), nsmall = 2)))%>%
-    dplyr::select(variable, 
+    dplyr::select(label, 
                   large_predictiveness, small_predictiveness, 
                   vimp, p)%>%
     gt::gt()%>%
     gt::cols_label(
-      variable = "", 
+      label = "", 
       large_predictiveness = md(paste("**V_full**")), 
       small_predictiveness = md(paste("**V_reduced**")), 
       vimp = md("**VIM [95% CI]**"),
@@ -688,7 +681,7 @@ tbl_vimp_survML <- function(vims){
               ifelse(x < 0.001, "<0.001",
                      formatC(x, format = "f", digits = 2))))%>%
     gt::tab_style(style = cell_text(weight = "bold"),
-                  locations = cells_body(columns = variable))
+                  locations = cells_body(columns = label))
 }
 
 
@@ -698,6 +691,7 @@ scatter_plot_vimp <- function(df){
   
   dat <- df %>%
     dplyr::select(variable, data_type, cohort, est) %>%
+    dplyr::filter(data_type %in% c("DNA_pathways","RNA_pathways"))%>%
     tidyr::pivot_wider(
       names_from  = cohort,
       values_from = est,
@@ -710,7 +704,7 @@ scatter_plot_vimp <- function(df){
   rho_all <- suppressWarnings(cor(dat$`est_Bio-RAIDs`, dat$`est_TCGA-CESC`, 
                                   method = "spearman"))
   p_all   <- suppressWarnings(cor.test(dat$`est_Bio-RAIDs`, dat$`est_TCGA-CESC`, 
-                                       method = "spearman")$p.value)
+                                       method = "spearman", exact = FALSE)$p.value)
   n_all   <- nrow(dat)
   
   lab_all <- paste0(
@@ -727,32 +721,32 @@ scatter_plot_vimp <- function(df){
       rho = cor(`est_Bio-RAIDs`, `est_TCGA-CESC`, 
                 method = "spearman"),
       p   = cor.test(`est_Bio-RAIDs`, `est_TCGA-CESC`, 
-                     method = "spearman")$p.value,
+                     method = "spearman", exact = FALSE)$p.value,
       .groups = "drop"
     ) %>%
     dplyr::arrange(data_type) %>%                 # ordre stable
     dplyr::mutate(
       label = paste0(
         data_type, ": ",
-        "\u03c1=", sprintf("%.2f", rho),
+        "\u03c1=", sprintf("%.3f", rho),
         ", p", ifelse(p < 0.001, "<0.001",
                       paste0("=", formatC(p, format = "f", digits = 3))),
         ", n=", n
       ),
-      y = c(0.24,0.23,0.22), 
+      y = c(0.24,0.23), 
     )
   
   
   ggplot2::ggplot(dat, ggplot2::aes(x = `est_Bio-RAIDs`, y = `est_TCGA-CESC`, 
                                     color = data_type)) +
     ggplot2::geom_point(alpha = 0.8) +
-    geom_labelsmooth(
+    geomtextpath::geom_labelsmooth(
       ggplot2::aes(label = data_type),
       fill = "white",
       method = "lm", formula = y ~ x,
       size = 3, linewidth = 1, boxlinewidth = 0.4
     ) +
-    geom_smooth(
+    ggplot2::geom_smooth(
       data = dat,
       aes(x = `est_Bio-RAIDs`, y = `est_TCGA-CESC`),
       inherit.aes = FALSE,
@@ -765,7 +759,7 @@ scatter_plot_vimp <- function(df){
                       hjust = -0.05, #vjust = 1.2, 
                       size = 3.2) +
     # Annotations by data type 
-    geom_text(
+    ggplot2::geom_text(
       data = ann,
       aes(x = 0.11, y = y, label = label, color = data_type),
       inherit.aes = FALSE,
@@ -791,11 +785,11 @@ get_top10_vimp_survML <- function(vims){
            est_ci = paste0(format(round(est, 3), nsmall = 3)," [",
                            format(round(cil_1sided, 3), nsmall = 3), "-",
                            format(round(ciu, 3), nsmall = 3), "]"))%>%
-    dplyr::select(n, variable, est_ci, p)%>%
+    dplyr::select(n, label, est_ci, p)%>%
     gt::gt()%>%
     gt::cols_label(
       n =  md("**N°**"), 
-      variable =  md("**Pathway**"), 
+      label =  md("**Pathway**"), 
       est_ci =  md("**VIM [95% CI]**"),
       p = md("**p-value**"))%>%
     gt::tab_style_body(style = cell_text(weight = "bold"),
@@ -807,7 +801,7 @@ get_top10_vimp_survML <- function(vims){
               ifelse(x < 0.001, "<0.001",
                      formatC(x, format = "f", digits = 2))))%>%
     gt::tab_style(style = cell_text(weight = "bold"),
-                  locations = cells_body(columns = variable))
+                  locations = cells_body(columns = label))
 }
 
 
@@ -815,11 +809,11 @@ get_top10_vimp_survML <- function(vims){
 get_overlap_top10_vimp_survML <- function(vims){
   top10 <- vims %>%
     map(~.x %>% 
-          dplyr::filter(!grepl("RNA_processes", data_type))%>%
+          dplyr::filter(!grepl("RNA_processes|DNA_processes", data_type))%>%
           group_split_custom(data_type, landmark_time)%>%
           map(~.x %>% dplyr::arrange(desc(est))%>%
                 dplyr::filter(row_number() %in% 1:10)%>%
-                dplyr::select(variable)%>%
+                dplyr::select(label)%>%
                 pull())%>%
           set_names(c("DNA-based pathways","RNA-based pathways")))
   
