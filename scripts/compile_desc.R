@@ -100,28 +100,58 @@ tbl_combined_pat_char <- combined$pathway$clin_dna_rna %>%
 
 ## Pathway-level frequencies of DNA alterations ----
 
-plot_dichotomous(combined$pathway$clin_dna_rna,
-                 var_prefix = "genomic_pathway_",
-                 with_group = TRUE,
-                 group_var = "cohort",
-                 xlab = "",
-                 ylab = "Pathway alteration frequency",
-                 fill_values = c("Bio-RAIDs" = "#1b9e77",
-                                 "TCGA-CESC" = "#377eb8"),
-                 legend.position = "top",
-                 legend.direction = "horizontal",
-                 process_panel = F)%>%
+plot_dichotomous(df                = combined$pathway$clin_dna_rna,
+                 var_prefix        = "genomic_pathway_",
+                 with_group        = TRUE,
+                 group_var         = "cohort",
+                 xlab              = "",
+                 ylab              = "Pathway alteration frequency",
+                 fill_values       = c("Bio-RAIDs" = "#1b9e77",
+                                       "TCGA-CESC" = "#377eb8"),
+                 legend.position   = "top",
+                 legend.direction  = "horizontal",
+                 process_panel     = F)%>%
   save_plot(here::here("outputs","figures"), 
-            "compare_barplot_DNA_pathways", 12, 12)
+            "compare_barplot_dna_pathways", 12, 12)
 
-tbl_compare_DNA_pathways <- combined$pathway$clin_dna_rna %>%
+plot_dichotomous(df                = combined$pathway$clin_dna_rna,
+                 var_prefix        = "genomic_pathway_",
+                 with_group        = TRUE,
+                 group_var         = "cohort",
+                 xlab              = "",
+                 ylab              = "Pathway alteration frequency",
+                 fill_values       = c("Bio-RAIDs" = "#1b9e77",
+                                       "TCGA-CESC" = "#377eb8"),
+                 legend.position   = "top",
+                 legend.direction  = "horizontal",
+                 process_panel     = T)%>%
+  save_plot(here::here("outputs","figures"), 
+            "compare_barplot_dna_pathways_panel", 23, 18)
+
+pdf(here::here("docs","articles","computers_in_biology_and_medicine", 
+               "Supplementary_Figure_S2.pdf"), width = 23, height = 16,
+    onefile = F)
+plot_dichotomous(df                = combined$pathway$clin_dna_rna,
+                 var_prefix        = "genomic_pathway_",
+                 with_group        = TRUE,
+                 group_var         = "cohort",
+                 xlab              = "",
+                 ylab              = "Pathway alteration frequency",
+                 fill_values       = c("Bio-RAIDs" = "#1b9e77",
+                                       "TCGA-CESC" = "#377eb8"),
+                 legend.position   = "top",
+                 legend.direction  = "horizontal",
+                 process_panel     = T)
+dev.off()
+
+tbl_compare_dna_pathways <- combined$pathway$clin_dna_rna %>%
   dplyr::select(cohort, starts_with("genomic_pathway"))%>%
   tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
   add_p(test = everything()~"fisher.test")%>%
   modify_header(label = "")%>%
   bold_labels()
 
-tbl_combined_DNA_pathways <- combined$pathway$clin_dna_rna %>%
+tbl_combined_dna_pathways <- combined$pathway$clin_dna_rna %>%
   dplyr::select(cohort, figo_c_f, starts_with("genomic_pathway"))%>%
   tbl_strata(
     strata = figo_c_f,
@@ -146,18 +176,48 @@ plot_continuous(combined$pathway$clin_dna_rna,
                                 "TCGA-CESC" = "#377eb8"),
                 legend.position = "top",
                 legend.direction = "horizontal",
+                process_panel = F)%>%
+  save_plot(here::here("outputs","figures"), 
+            "compare_boxplot_rna_pathways", 15, 20)
+
+plot_continuous(combined$pathway$clin_dna_rna,
+                var_prefix = "hallmark_",
+                with_group = TRUE,
+                group_var = "cohort",
+                xlab = "",
+                ylab = "Pathway-activity score",
+                fill_values = c("Bio-RAIDs" = "#1b9e77",
+                                "TCGA-CESC" = "#377eb8"),
+                legend.position = "top",
+                legend.direction = "horizontal",
                 process_panel = T)%>%
   save_plot(here::here("outputs","figures"), 
-            "compare_boxplot_RNA_pathways", 24, 20)
+            "compare_boxplot_rna_pathways_panel", 24, 20, newpage = F)
 
-tbl_compare_RNA_pathways <- combined$pathway$clin_dna_rna %>%
+pdf(here::here("docs","articles","computers_in_biology_and_medicine", 
+               "Supplementary_Figure_S3.pdf"), width = 24, height = 20,
+    onefile = F)
+plot_continuous(combined$pathway$clin_dna_rna,
+                var_prefix = "hallmark_",
+                with_group = TRUE,
+                group_var = "cohort",
+                xlab = "",
+                ylab = "Pathway-activity score",
+                fill_values = c("Bio-RAIDs" = "#1b9e77",
+                                "TCGA-CESC" = "#377eb8"),
+                legend.position = "top",
+                legend.direction = "horizontal",
+                process_panel = T)
+dev.off()
+
+tbl_compare_rna_pathways <- combined$pathway$clin_dna_rna %>%
   dplyr::select(cohort, starts_with("hallmark_"))%>%
   tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
   add_p(test = everything()~"wilcox.test")%>%
   modify_header(label = "")%>%
   bold_labels()
 
-tbl_combined_RNA_pathways <- combined$pathway$clin_dna_rna %>%
+tbl_combined_rna_pathways <- combined$pathway$clin_dna_rna %>%
   dplyr::select(cohort, figo_c_f, starts_with("hallmark_"))%>%
   tbl_strata(
     strata = figo_c_f,
@@ -195,13 +255,13 @@ purrr::iwalk(
       purrr::iwalk(~save_plot(
         .x,
         here::here("outputs", "figures"),
-        paste0(.y, "_plot_cor_", type, "_clin_DNA_pathways"),
+        paste0(.y, "_plot_cor_", type, "_clin_dna_pathways"),
         10, 8
       ))
   }
 )
 
-## Association between clinical variables RNA-based pathways ----
+## Association between clinical variables and RNA-based pathways ----
 
 params <- tibble::tibble(
   var = c("age_c_f", "figo_c_f", "hpv_negative_f"),
@@ -235,13 +295,15 @@ purrr::iwalk(
         ) %>%
           save_plot(
             here::here("outputs", "figures"),
-            paste0(cohort_name, "_cor_boxplot_RNA_pathways_", var),
+            paste0(cohort_name, "_cor_boxplot_rna_pathways_", var),
             24, 20
           )
       }
     )
   }
 )
+
+## Association between DNA- and RNA-based pathways ----
 
 ## Association between RNA-based pathways ----
 
@@ -251,7 +313,7 @@ combined$pathway$clin_dna_rna %>%
                dplyr::select(starts_with("hallmark")) %>%
                plot_cor_continuous())%>%
   iwalk(~save_plot(.x, here::here("outputs","figures"),
-                   paste0(.y, "_plot_cor_RNA_pathways"), 10, 10))
+                   paste0(.y, "_plot_cor_rna_pathways"), 10, 10))
 
 # Survival curves ---------------------------------------------------------
 
@@ -265,7 +327,13 @@ combined_sets %>%
             palette      = c("#1b9e77","#377eb8"))%>%
   iwalk(~save_plot(., here::here("outputs","figures"),
                    paste0("compare_surv_plot_", .y),
-                   7.3, 5.8, newpage = F))
+                   6, 5.8, newpage = F))
+
+file.copy(here::here("outputs","figures", 
+                     "compare_surv_plot_clin_dna_rna_cohort.pdf"), 
+          here::here("docs","articles","computers_in_biology_and_medicine", 
+                     "Supplementary_Figure_S1.pdf"), 
+          overwrite = TRUE)
 
 ## Progression-free survival on subsets defined by variables 
 combined$pathway$clin_dna_rna %>%
@@ -281,7 +349,7 @@ combined$pathway$clin_dna_rna %>%
         set_names(gsub("data","surv_plot_clin_dna_rna", names(.))))%>%
   purrr::list_flatten()%>%
   iwalk(~save_plot(., here::here("outputs","figures"), .y,
-                   6.3, 6, newpage = F))
+                   6, 5.8, newpage = F))
 
 # Survival tables ---------------------------------------------------------
 
@@ -300,7 +368,7 @@ tbl_compare_surv <- combined_sets %>%
 
 # Cox proportional hazards models -----------------------------------------
 
-tbl_compare_cox_univ <- tbl_cox_strata(
+tbl_compare_cox_univ <- tbl_cox(
   data   = combined$pathway$clin_dna_rna,
   time   = "time",
   event  = "event",
@@ -309,7 +377,7 @@ tbl_compare_cox_univ <- tbl_cox_strata(
   model  = "univ"
 )
 
-tbl_compare_cox_multi <- tbl_cox_strata(
+tbl_compare_cox_multi <- tbl_cox(
   data   = combined$pathway$clin_dna_rna,
   time   = "time",
   event  = "event",
