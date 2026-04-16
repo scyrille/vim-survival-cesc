@@ -202,104 +202,102 @@ compute_gsva <- function(gene_expression,
 #' \itemize{
 #'   \item `num`: numeric identifier of the pathway,
 #'   \item `variable`: pathway name,
+#'   \item `label`: pathway label,
 #'   \item `process`: associated biological process category,
 #'   \item `data_type`: type of pathway (`"DNA_pathways"` or `"RNA_pathways"`).
 #' }
 #'
 #' @export
 get_pathways_process <- function(){
-  pathways_df <- bind_rows(
-    tibble(num = 1:26,
-           variable =  c("Adhesion/Migration",
-                         "Apoptosis",
-                         "Cell cycle",
-                         "Cellular Metabolism", 
-                         "Chromatin organization",
-                         "Development ==> Notch",
-                         "DNA repair", 
-                         "Epigenetics",
-                         "Genome integrity ==> p53",
-                         "Hedgehog signaling pathway",
-                         "Hippo signaling pathway",
-                         "Immunity",
-                         "JAK-STAT signaling pathway",
-                         "mRNA Processing",
-                         "MAPK",
-                         "Myc",
-                         "Oxydative stress",
-                         "PI3K",
-                         "Proteins Processing",
-                         "Regulation Of Gene Expression",
-                         "RTK/RAS",
-                         "Senescence",
-                         "TGF-beta",
-                         "Transcription factor-regulator",
-                         "Wnt Signaling Pathway",
-                         "Others"),
-           process = "",
-           data_type = "DNA_pathways"),
-    tibble(num = 1:50,
-           variable =  c("HALLMARK_APICAL_JUNCTION",
-                         "HALLMARK_APICAL_SURFACE",
-                         "HALLMARK_PEROXISOME",
-                         "HALLMARK_ADIPOGENESIS",
-                         "HALLMARK_ANGIOGENESIS",
-                         "HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION",
-                         "HALLMARK_MYOGENESIS",
-                         "HALLMARK_SPERMATOGENESIS",
-                         "HALLMARK_PANCREAS_BETA_CELLS",
-                         "HALLMARK_DNA_REPAIR",
-                         "HALLMARK_UV_RESPONSE_DN",
-                         "HALLMARK_UV_RESPONSE_UP",
-                         "HALLMARK_ALLOGRAFT_REJECTION",
-                         "HALLMARK_COAGULATION",
-                         "HALLMARK_COMPLEMENT",
-                         "HALLMARK_INTERFERON_ALPHA_RESPONSE",
-                         "HALLMARK_INTERFERON_GAMMA_RESPONSE",
-                         "HALLMARK_IL6_JAK_STAT3_SIGNALING",
-                         "HALLMARK_INFLAMMATORY_RESPONSE",
-                         "HALLMARK_BILE_ACID_METABOLISM",
-                         "HALLMARK_CHOLESTEROL_HOMEOSTASIS",
-                         "HALLMARK_FATTY_ACID_METABOLISM",
-                         "HALLMARK_GLYCOLYSIS",
-                         "HALLMARK_HEME_METABOLISM",
-                         "HALLMARK_OXIDATIVE_PHOSPHORYLATION",
-                         "HALLMARK_XENOBIOTIC_METABOLISM",
-                         "HALLMARK_APOPTOSIS",
-                         "HALLMARK_HYPOXIA",
-                         "HALLMARK_PROTEIN_SECRETION",
-                         "HALLMARK_UNFOLDED_PROTEIN_RESPONSE",
-                         "HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY",
-                         "HALLMARK_E2F_TARGETS",
-                         "HALLMARK_G2M_CHECKPOINT",
-                         "HALLMARK_MYC_TARGETS_V1",
-                         "HALLMARK_MYC_TARGETS_V2",
-                         "HALLMARK_P53_PATHWAY",
-                         "HALLMARK_MITOTIC_SPINDLE",
-                         "HALLMARK_ANDROGEN_RESPONSE",
-                         "HALLMARK_ESTROGEN_RESPONSE_EARLY",
-                         "HALLMARK_ESTROGEN_RESPONSE_LATE",
-                         "HALLMARK_IL2_STAT5_SIGNALING",
-                         "HALLMARK_KRAS_SIGNALING_UP",
-                         "HALLMARK_KRAS_SIGNALING_DN",
-                         "HALLMARK_MTORC1_SIGNALING",
-                         "HALLMARK_NOTCH_SIGNALING",
-                         "HALLMARK_PI3K_AKT_MTOR_SIGNALING",
-                         "HALLMARK_HEDGEHOG_SIGNALING",
-                         "HALLMARK_TGF_BETA_SIGNALING",
-                         "HALLMARK_TNFA_SIGNALING_VIA_NFKB",
-                         "HALLMARK_WNT_BETA_CATENIN_SIGNALING"),
-           process = c(rep("Cellular component", 3),
-                       rep("Development", 6),
-                       rep("DNA damage", 3),
-                       rep("Immune", 7),
-                       rep("Metabolic", 7),
-                       rep("Pathway", 5),
-                       rep("Proliferation", 6),
-                       rep("Signaling", 13)),
-           data_type = "RNA_pathways")
-  )
-  return(pathways_df)
+  dna_pathways <- 
+    tibble::tribble(
+      ~variable, ~label, ~process, ~data_type,
+      "Adhesion/Migration",               "Adhesion/Migration",              "Cellular component",             "DNA_pathways",
+      "Apoptosis",                        "Apoptosis",                       "Pathway",                        "DNA_pathways", 
+      "Cell cycle",                       "Cell cycle",                      "Proliferation",                  "DNA_pathways", 
+      "Cellular Metabolism",              "Cellular metabolism",             "Metabolic",                      "DNA_pathways",
+      "Chromatin organization",           "Chromatin organization",          "Epigenetics",                    "DNA_pathways", 
+      "Development ==> Notch",            "Notch",                           "Signaling",                      "DNA_pathways",
+      "DNA repair",                       "DNA repair",                      "DNA damage",                     "DNA_pathways", 
+      "Epigenetics",                      "Epigenetics",                     "Epigenetics",                    "DNA_pathways",
+      "Genome integrity ==> p53",         "Genome integrity via p53",        "DNA damage",                     "DNA_pathways", 
+      "Hedgehog signaling pathway",       "Hedgehog",                        "Signaling",                      "DNA_pathways",
+      "Hippo signaling pathway",          "Hippo",                           "Signaling",                      "DNA_pathways",
+      "Immunity",                         "Immunity",                        "Immune",                         "DNA_pathways", 
+      "JAK-STAT signaling pathway",       "JAK/STAT",                        "Immune",                         "DNA_pathways", 
+      "mRNA Processing",                  "mRNA processing",                 "Metabolic",                      "DNA_pathways", 
+      "MAPK",                             "MAPK",                            "Signaling",                      "DNA_pathways", 
+      "Myc",                              "Myc",                             "Proliferation",                  "DNA_pathways", 
+      "Oxydative stress",                 "Oxidative stress",                "Pathway",                        "DNA_pathways", 
+      "PI3K",                             "PI3K",                            "Signaling",                      "DNA_pathways", 
+      "Proteins Processing",              "Proteins processing",             "Pathway",                        "DNA_pathways",
+      "Regulation Of Gene Expression",    "Regulation of gene expression",   "Metabolic",                      "DNA_pathways",
+      "RTK/RAS",                          "RTK/RAS",                         "Signaling",                      "DNA_pathways", 
+      "Senescence",                       "Senescence",                      "Proliferation",                  "DNA_pathways", 
+      "TGF-beta",                         "TGF-\u03b2",                      "Signaling",                      "DNA_pathways",
+      "Transcription factor-regulator",   "Transcriptional regulator",       "Metabolic",                      "DNA_pathways",
+      "Wnt Signaling Pathway",            "Wnt",                             "Signaling",                      "DNA_pathways", 
+    )%>%
+    dplyr::arrange(process, label)%>%
+    dplyr::mutate(num = 1:dplyr::n(), .before = variable)
+  
+  rna_pathways <- 
+    tibble::tribble(
+      ~variable, ~label, ~process, ~data_type,
+      "HALLMARK_APICAL_JUNCTION",                     "Apical junction",                    "Cellular component",    "RNA_pathways", 
+      "HALLMARK_APICAL_SURFACE",                      "Apical surface",                     "Cellular component",    "RNA_pathways", 
+      "HALLMARK_PEROXISOME",                          "Peroxisome",                         "Cellular component",    "RNA_pathways", 
+      "HALLMARK_ADIPOGENESIS",                        "Adipogenesis",                       "Development",           "RNA_pathways", 
+      "HALLMARK_ANGIOGENESIS",                        "Angiogenesis",                       "Development",           "RNA_pathways", 
+      "HALLMARK_EPITHELIAL_MESENCHYMAL_TRANSITION",   "Epithelial mesenchymal transition",  "Development",           "RNA_pathways", 
+      "HALLMARK_MYOGENESIS",                          "Myogenesis",                         "Development",           "RNA_pathways", 
+      "HALLMARK_SPERMATOGENESIS",                     "Spermatogenesis",                    "Development",           "RNA_pathways", 
+      "HALLMARK_PANCREAS_BETA_CELLS",                 "Pancreas \u03b2 cells",              "Development",           "RNA_pathways",
+      "HALLMARK_DNA_REPAIR",                          "DNA repair",                         "DNA damage",            "RNA_pathways",
+      "HALLMARK_UV_RESPONSE_DN",                      "UV response: down-regulated genes",  "DNA damage",            "RNA_pathways", 
+      "HALLMARK_UV_RESPONSE_UP",                      "UV response: up-regulated genes",    "DNA damage",            "RNA_pathways", 
+      "HALLMARK_ALLOGRAFT_REJECTION",                 "Allograft rejection",                "Immune",                "RNA_pathways",
+      "HALLMARK_COAGULATION",                         "Coagulation",                        "Immune",                "RNA_pathways",
+      "HALLMARK_COMPLEMENT",                          "Complement",                         "Immune",                "RNA_pathways",
+      "HALLMARK_INTERFERON_ALPHA_RESPONSE",           "Interferon \u03b1 response",         "Immune",                "RNA_pathways", 
+      "HALLMARK_INTERFERON_GAMMA_RESPONSE",           "Interferon \u03b3 response",         "Immune",                "RNA_pathways",
+      "HALLMARK_IL6_JAK_STAT3_SIGNALING",             "IL6/JAK/STAT3",                      "Immune",                "RNA_pathways", 
+      "HALLMARK_INFLAMMATORY_RESPONSE",               "Inflammatory response",              "Immune",                "RNA_pathways",
+      "HALLMARK_BILE_ACID_METABOLISM",                "Bile acide metabolism",              "Metabolic",             "RNA_pathways", 
+      "HALLMARK_CHOLESTEROL_HOMEOSTASIS",             "Cholesterol homeostasis",            "Metabolic",             "RNA_pathways",       
+      "HALLMARK_FATTY_ACID_METABOLISM",               "Fatty acid metabolism",              "Metabolic",             "RNA_pathways", 
+      "HALLMARK_GLYCOLYSIS",                          "Glycolysis",                         "Metabolic",             "RNA_pathways",
+      "HALLMARK_HEME_METABOLISM",                     "Heme metabolism",                    "Metabolic",             "RNA_pathways", 
+      "HALLMARK_OXIDATIVE_PHOSPHORYLATION",           "Oxidative phosphorylation",          "Metabolic",             "RNA_pathways", 
+      "HALLMARK_XENOBIOTIC_METABOLISM",               "Xenobiotic metabolism",              "Metabolic",             "RNA_pathways", 
+      "HALLMARK_APOPTOSIS",                           "Apoptosis",                          "Pathway",               "RNA_pathways", 
+      "HALLMARK_HYPOXIA",                             "Hypoxia",                            "Pathway",               "RNA_pathways", 
+      "HALLMARK_PROTEIN_SECRETION",                   "Protein secretion",                  "Pathway",               "RNA_pathways", 
+      "HALLMARK_UNFOLDED_PROTEIN_RESPONSE",           "Unfolded protein response",          "Pathway",               "RNA_pathways", 
+      "HALLMARK_REACTIVE_OXYGEN_SPECIES_PATHWAY",     "Reactive oxygen species",            "Pathway",               "RNA_pathways", 
+      "HALLMARK_E2F_TARGETS",                         "E2F targets",                        "Proliferation",         "RNA_pathways",
+      "HALLMARK_G2M_CHECKPOINT",                      "G2M checkpoint",                     "Proliferation",         "RNA_pathways",
+      "HALLMARK_MYC_TARGETS_V1",                      "Myc targets variant 1",              "Proliferation",         "RNA_pathways", 
+      "HALLMARK_MYC_TARGETS_V2",                      "Myc targets variant 2",              "Proliferation",         "RNA_pathways", 
+      "HALLMARK_P53_PATHWAY",                         "p53",                                "Proliferation",         "RNA_pathways", 
+      "HALLMARK_MITOTIC_SPINDLE",                     "Mitotic spindle",                    "Proliferation",         "RNA_pathways", 
+      "HALLMARK_ANDROGEN_RESPONSE",                   "Androgen response",                  "Signaling",             "RNA_pathways",
+      "HALLMARK_ESTROGEN_RESPONSE_EARLY",             "Early estrogen response",            "Signaling",             "RNA_pathways",
+      "HALLMARK_ESTROGEN_RESPONSE_LATE",              "Late estrogen response",             "Signaling",             "RNA_pathways",
+      "HALLMARK_IL2_STAT5_SIGNALING",                 "IL2/STAT5",                          "Signaling",             "RNA_pathways", 
+      "HALLMARK_KRAS_SIGNALING_UP",                   "KRAS: up-regulated genes",           "Signaling",             "RNA_pathways", 
+      "HALLMARK_KRAS_SIGNALING_DN",                   "KRAS: down-regulated genes",         "Signaling",             "RNA_pathways", 
+      "HALLMARK_MTORC1_SIGNALING",                    "MTORC1",                             "Signaling",             "RNA_pathways", 
+      "HALLMARK_NOTCH_SIGNALING",                     "Notch",                              "Signaling",             "RNA_pathways", 
+      "HALLMARK_PI3K_AKT_MTOR_SIGNALING",             "PI3K/AKT/MTOR",                      "Signaling",             "RNA_pathways",
+      "HALLMARK_HEDGEHOG_SIGNALING",                  "Hedgehog",                           "Signaling",             "RNA_pathways",
+      "HALLMARK_TGF_BETA_SIGNALING",                  "TGF-\u03b2",                         "Signaling",             "RNA_pathways", 
+      "HALLMARK_TNFA_SIGNALING_VIA_NFKB",             "TNF-\u03b1/NF-\u03baB",              "Signaling",             "RNA_pathways", 
+      "HALLMARK_WNT_BETA_CATENIN_SIGNALING",          "Wnt/\u03b2-catenin",                 "Signaling",             "RNA_pathways")%>%
+    dplyr::arrange(process, label)%>%
+    dplyr::mutate(num = 1:dplyr::n(), .before = variable)
+  
+  dplyr::bind_rows(dna_pathways, rna_pathways) 
 }
 
 #' Split a plot into predefined biological process panels
@@ -348,7 +346,9 @@ get_pathways_process <- function(){
 #'
 #' @export
 plot_process_panel <- function(df_long, fun, stats_df = NULL,
-                               legend.position, ...) {
+                               legend.position, 
+                               widths = c(1, 1), 
+                               heights = c(1, 1), ...) {
   
   df_long <- df_long %>%
     dplyr::left_join(get_pathways_process(), by = "variable")
@@ -361,7 +361,7 @@ plot_process_panel <- function(df_long, fun, stats_df = NULL,
   df_p1 <- df_long %>%
     dplyr::filter(process %in% c("Cellular component", "DNA damage", "Pathway"))
   df_p2 <- df_long %>%
-    dplyr::filter(process %in% c("Proliferation", "Development"))
+    dplyr::filter(process %in% c("Proliferation", "Development", "Epigenetics"))
   df_p3 <- df_long %>%
     dplyr::filter(process %in% c("Metabolic", "Immune"))
   df_p4 <- df_long %>%
@@ -371,7 +371,9 @@ plot_process_panel <- function(df_long, fun, stats_df = NULL,
     dplyr::filter(stats_df, process %in% c("Cellular component", 
                                            "DNA damage", "Pathway")) else NULL
   stats_p2 <- if (!is.null(stats_df)) 
-    dplyr::filter(stats_df, process %in% c("Proliferation", "Development")) else NULL
+    dplyr::filter(stats_df, process %in% c("Proliferation", 
+                                           "Development",
+                                           "Epigenetics")) else NULL
   stats_p3 <- if (!is.null(stats_df)) 
     dplyr::filter(stats_df, process %in% c("Metabolic", "Immune")) else NULL
   stats_p4 <- if (!is.null(stats_df)) 
@@ -401,7 +403,8 @@ plot_process_panel <- function(df_long, fun, stats_df = NULL,
   egg::ggarrange(
     p1, p2, p3, p4,
     ncol = 2, nrow = 2,
-    widths = c(1, 1), heights = c(1, 1)
+    widths = widths, 
+    heights = heights
   )
 }
 
@@ -475,6 +478,9 @@ plot_continuous <- function(df,
                        legend.position,
                        legend.direction) {
     
+    lab_map <- setNames(get_pathways_process()$label,
+                        get_pathways_process()$variable)
+    
     if (with_group) {
       plot <- ggplot2::ggplot(
         df_long,
@@ -491,6 +497,7 @@ plot_continuous <- function(df,
           label = "p.signif",
           colour = "#F8766D"
         ) +
+        ggplot2::scale_x_discrete(labels = lab_map) +
         ggplot2::scale_fill_manual(values = fill_values)
     } else {
       plot <- ggplot2::ggplot(
@@ -653,11 +660,15 @@ plot_dichotomous <- function(df,
                        legend.position,
                        legend.direction) {
     
+    lab_map <- setNames(get_pathways_process()$label,
+                        get_pathways_process()$variable)
+    
     if (with_group) {
       plot <- ggplot2::ggplot(
         df_long,
         ggplot2::aes(
-          x = stats::reorder(.data[["variable"]], .data[["value"]]),
+          # x = stats::reorder(.data[["variable"]], .data[["value"]]),
+          x = .data[["variable"]],
           y = .data[["value"]],
           fill = .data[[group_var]]
         )
@@ -672,7 +683,8 @@ plot_dichotomous <- function(df,
       plot <- ggplot2::ggplot(
         df_long,
         ggplot2::aes(
-          x = stats::reorder(.data[["variable"]], .data[["value"]]),
+          # x = stats::reorder(.data[["variable"]], .data[["value"]]),
+          x = .data[["variable"]],
           y = .data[["value"]]
         )
       ) +
@@ -685,7 +697,8 @@ plot_dichotomous <- function(df,
     plot <- plot +
       ggplot2::labs(x = xlab, y = ylab, fill = "") +
       ggplot2::coord_flip() +
-      ggplot2::scale_y_continuous(labels = scales::percent)
+      ggplot2::scale_x_discrete(labels = lab_map)+
+      ggplot2::scale_y_continuous(labels = scales::percent, limits = c(0,0.6))
     
     if (!is.null(stats_df)) {
       ymax <- max(df_long$value, na.rm = TRUE)
@@ -695,7 +708,7 @@ plot_dichotomous <- function(df,
           data = stats_df,
           ggplot2::aes(
             x = .data[["variable"]],
-            y = 1.05 * ymax,
+            y = 0.58,
             label = .data[["pval_stars"]]
           ),
           inherit.aes = FALSE,
@@ -714,17 +727,15 @@ plot_dichotomous <- function(df,
   
   if (process_panel) {
     plot_process_panel(
-      df_long = dplyr::left_join(df_long, get_pathways_process(), 
-                                 by = "variable"),
+      df_long = df_long,
       fun = .barplot,
-      stats_df = if (!is.null(stats_df)) 
-        dplyr::left_join(stats_df, get_pathways_process(), 
-                         by = "variable") else NULL,
+      stats_df = if (!is.null(stats_df)) stats_df else NULL,
       with_group = with_group,
       group_var = group_var,
       xlab = xlab,
       ylab = ylab,
       fill_values = fill_values,
+      heights = c(1, 1), 
       legend.position = legend.position,
       legend.direction = legend.direction
     )
