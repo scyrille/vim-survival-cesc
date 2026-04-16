@@ -30,15 +30,8 @@ input_survML_full_fit <- raids$pathway %>%
                  )
              )
 
-# library(furrr)
-# library(future)
-# message("Number of parallel workers: ", future::nbrOfWorkers())
-# future::plan(multisession, workers = 3)
-# message("Number of parallel workers: ", future::nbrOfWorkers())
-
 start <- Sys.time()
 vimp_survML_full_fit <- input_survML_full_fit %>%
-  # furrr::future_map(
   purrr::map(
     ~ compute_vimp_survML_full(
         time           = .x$time,
@@ -46,13 +39,8 @@ vimp_survML_full_fit <- input_survML_full_fit %>%
         X              = .x$X,
         feature_groups = .x$feature_groups,
         seed           = 123
-        )#,
-    # .options = furrr::furrr_options(
-    #   seed     = TRUE,
-    #   packages = c("survML", "SuperLearner", "glmnet", "ranger", "xgboost", 
-    #                "withr", "dplyr", "stringr", "purrr")
-    # )
-  )
+        )
+    )
 end <- Sys.time()
 vimp_survML_full_fit_runtime <- as.numeric(difftime(end, start, units = "mins"))
 
