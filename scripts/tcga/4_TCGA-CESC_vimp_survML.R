@@ -24,23 +24,14 @@ tcga <- read_processed(cohort = "tcga")
 input_survML_full_fit <- tcga$pathway %>%
   purrr::map(~.x %>% 
                make_input_vimp_survML_full(
-                 var_clin = c("age","hpv_negative","figo"#,"necrosis"
-                              ),
-                 # dna_prefix = "genomic_pathway_|hrd|tmb_high",
+                 var_clin = c("age","hpv_negative","figo"),
                  dna_prefix = "genomic_pathway_",
                  rna_prefix = "hallmark_"
                )
   )
 
-# library(furrr)
-# library(future)
-# message("Number of parallel workers: ", future::nbrOfWorkers())
-# future::plan(multisession, workers = 3)
-# message("Number of parallel workers: ", future::nbrOfWorkers())
-
 start <- Sys.time()
 vimp_survML_full_fit <- input_survML_full_fit %>%
-  # furrr::future_map(
   purrr::map(
     ~ compute_vimp_survML_full(
       time           = .x$time,
@@ -48,12 +39,7 @@ vimp_survML_full_fit <- input_survML_full_fit %>%
       X              = .x$X,
       feature_groups = .x$feature_groups,
       seed           = 123
-    )#,
-    # .options = furrr::furrr_options(
-    #   seed     = TRUE,
-    #   packages = c("survML", "SuperLearner", "glmnet", "ranger", "xgboost", 
-    #                "withr", "dplyr", "stringr", "purrr")
-    # )
+    )
   )
 end <- Sys.time()
 vimp_survML_full_fit_runtime <- as.numeric(difftime(end, start, units = "mins"))
