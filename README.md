@@ -70,7 +70,7 @@ data/tcga/raw
 
 2. Bio-RAIDs cohort (NCT02428842)
 
-The Bio-RAIDs cohort consists of clinically annotated cervical cancer patients frim a multicenter European study. 
+The Bio-RAIDs cohort consists of clinically annotated cervical cancer patients from a multicenter European study. 
 
 * These data are **not publicly available**.
 * Access is subject to institutional agreements and data-sharing policies.
@@ -85,7 +85,7 @@ The Bio-RAIDs cohort consists of clinically annotated cervical cancer patients f
   volume = {15},
   ISSN = {1471-2407},
   url = {http://dx.doi.org/10.1186/s12885-015-1801-0},
-  DOI = {10.1186/s12885-015-1801-0},
+  doi = {10.1186/s12885-015-1801-0},
   number = {1},
   journal = {BMC Cancer},
   publisher = {Springer Science and Business Media LLC},
@@ -98,29 +98,12 @@ The Bio-RAIDs cohort consists of clinically annotated cervical cancer patients f
 **TCGA-CESC**: 
 ```
 @misc{Lucchesi2016,
-  title     = "The Cancer Genome Atlas Cervical Squamous Cell Carcinoma and
-               Endocervical Adenocarcinoma collection ({TCGA-CESC})",
-  author    = "Lucchesi, Fabiano R and Aredes, Nat{\'a}lia D",
-  abstract  = "The Cancer Genome Atlas Cervical Squamous Cell Carcinoma and
-               Endocervical Adenocarcinoma (TCGA-CESC) data collection is part
-               of a larger effort to build a research community focused on
-               connecting cancer phenotypes to genotypes by providing clinical
-               images matched to subjects from The Cancer Genome Atlas (TCGA).
-               Clinical, genetic, and pathological data resides in the Genomic
-               Data Commons (GDC) Data Portal while the radiological data is
-               stored on The Cancer Imaging Archive (TCIA). Matched TCGA
-               patient identifiers allow researchers to explore the TCGA/TCIA
-               databases for correlations between tissue genotype, radiological
-               phenotype and patient outcomes. Tissues for TCGA were collected
-               from many sites all over the world in order to reach their
-               accrual targets, usually around 500 specimens per cancer type.
-               For this reason the image data sets are also extremely
-               heterogeneous in terms of scanner modalities, manufacturers and
-               acquisition protocols. In most cases the images were acquired as
-               part of routine care and not as part of a controlled research
-               study or clinical trial.",
-  publisher = "The Cancer Imaging Archive",
-  year      =  2016
+	title = {The {Cancer} {Genome} {Atlas} {Cervical} {Squamous} {Cell} {Carcinoma} and {Endocervical} {Adenocarcinoma} collection ({TCGA}-{CESC})},
+	url = {https://www.cancerimagingarchive.net/collection/tcga-cesc/},
+	doi = {https://doi.org/10.7937/K9/TCIA.2016.SQ4M8YP4},
+	publisher = {The Cancer Imaging Archive},
+	author = {Lucchesi, Fabiano R and Aredes, Natália D},
+	year = {2016},
 }
 ```
 
