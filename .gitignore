@@ -10,7 +10,6 @@
 # ======================
 # Data (critical)
 # ======================
-*.rds
 *.xlsx
 *.xls
 *.tsv
@@ -18,7 +17,7 @@
 *.xml
 *.txt
 *.gz
-*.rds 
+*.rds
 *.csv
 !data/raw/dna_gene_sets.csv
 !data/raw/rna_gene_sets.csv
