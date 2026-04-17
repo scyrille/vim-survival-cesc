@@ -10,12 +10,21 @@
 # ======================
 # Data (critical)
 # ======================
-data/raw/*
+*.rds
+*.xlsx
+*.xls
+*.tsv
+*.bed
+*.xml
+*.txt
+*.gz
+*.rds 
+*.csv
 !data/raw/dna_gene_sets.csv
 !data/raw/rna_gene_sets.csv
 !data/raw/cancerGeneList.tsv
 !data/raw/gencode.v34.annotation_gene.bed
-data/processed/
+!data/processed/tcga/tcga_processed_data.csv
 
 # ======================
 # Outputs
@@ -26,9 +35,16 @@ outputs/
 # Report sources
 # =========================
 
+*.yml
 report_sources/
 *_files/
 *.knit.md
 *.utf8.md
-
 /.quarto/
+
+# =========================
+# Documents
+# =========================
+*.pdf
+*.docx
+docs/articles/
