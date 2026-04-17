@@ -12,8 +12,6 @@
 # ======================
 *.xlsx
 *.xls
-*.tsv
-*.bed
 *.xml
 *.txt
 *.gz
@@ -21,9 +19,11 @@
 *.csv
 !data/raw/dna_gene_sets.csv
 !data/raw/rna_gene_sets.csv
-!data/raw/cancerGeneList.tsv
-!data/raw/gencode.v34.annotation_gene.bed
 !data/processed/tcga/tcga_processed_data.csv
+*.tsv
+!data/raw/cancerGeneList.tsv
+*.bed
+!data/raw/gencode.v34.annotation_gene.bed
 
 # ======================
 # Outputs
