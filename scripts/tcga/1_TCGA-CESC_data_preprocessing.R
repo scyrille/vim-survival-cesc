@@ -150,4 +150,6 @@ tcga <- integrate_data(
   pre_filter         = TRUE
 )
 
+write.csv2(tcga$pathway$clin_dna_rna, row.names = F, 
+           file = here::here("data/processed/tcga/tcga_data_processed.csv"))
 saveRDS(tcga, here::here("data/processed/tcga/tcga_processed_data.RDS"))
