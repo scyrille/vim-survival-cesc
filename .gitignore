@@ -10,7 +10,6 @@
 # ======================
 # Data (critical)
 # ======================
-*.xlsx
 *.xls
 *.xml
 *.txt
@@ -24,6 +23,9 @@
 !data/raw/cancerGeneList.tsv
 *.bed
 !data/raw/gencode.v34.annotation_gene.bed
+*.xlsx
+!data/raw/tcga/NIHMS978596-supplement-1.xlsx
+!data/raw/tcga/ppat.1008468.s009.xlsx
 
 # ======================
 # Outputs
