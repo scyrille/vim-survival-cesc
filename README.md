@@ -65,8 +65,7 @@ Data can be accessed via:
 
 In this repository, TCGA data are downloaded programmatically using `TCGAbiolinks` and saved locally in: 
 
-data/tcga/raw
-
+data/raw/tcga
 
 2. Bio-RAIDs cohort (NCT02428842)
 
@@ -74,7 +73,7 @@ The Bio-RAIDs cohort consists of clinically annotated cervical cancer patients f
 
 * These data are **not publicly available**.
 * Access is subject to institutional agreements and data-sharing policies.
-* The data are not stored locally and **not distributed with this repository**.
+* The data are **not distributed with this repository**.
 
 ## References 
 
