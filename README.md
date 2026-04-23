@@ -95,7 +95,8 @@ BiocManager::install("TCGAbiolinks")
   * Cox regression with likelihood-based boosting
   * Variable importance analysis 
 
-**6. Cross-cohort comparison **
+
+**6. Cross-cohort comparison**
 
 ## Data access 
 
