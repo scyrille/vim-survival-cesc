@@ -2,7 +2,32 @@
 
 ## Context 
 
-Reliable prognostic biomarkers remain an unmet need in advanced cervical cancer (CESC), where clinical factors alone provide limited risk stratification. Although multi-omics profiling has identified numerous candidate molecular markers, their translational impact has been hindered by limited reproducibility, high dimensionality, and model-dependent inference. Pathway-level aggregation offers a biologically informed strategy to reduce feature redundancy and improve interpretability, while model-agnostic variable importance measures (VIMs) enable robust assessment of incremental predictive value in survival settings. We leverage two independent and complementary CESC cohorts—Bio-RAIDs and TCGA-CESC—to evaluate the stability and reproducibility of pathway-level prognostic signals across studies. This work aims to provide methodological insights into robust biomarker discovery and to illustrate how reproducibility-driven analytical strategies can support translational oncology research.
+Reliable prognostic biomarkers remain an unmet need in advanced cervical 
+cancer (CESC), where clinical factors alone provide limited risk 
+stratification. Although multi-omics profiling has identified numerous 
+candidate molecular markers, their translational impact has been hindered 
+by limited reproducibility, high dimensionality, and model-dependent 
+inference. Pathway-level aggregation offers a biologically informed 
+strategy to reduce feature redundancy and improve interpretability, 
+while model-agnostic variable importance measures (VIMs) enable robust 
+assessment of incremental predictive value in survival settings. 
+
+We leverage two independent and complementary CESC cohorts—Bio-RAIDs 
+and TCGA-CESC—to evaluate the stability and reproducibility of 
+pathway-level prognostic signals across studies. This work aims to 
+provide methodological insights into robust biomarker discovery and 
+to illustrate how reproducibility-driven analytical strategies can support 
+translational oncology research.
+
+We propose an integrative framework that combines penalized Cox models, 
+likelihood-based boosting, and model-agnostic variable importance to 
+evaluate the added predictive value of pathway-level molecular data 
+(genomic and transcriptomic).
+
+The framework was applied to two independent cervical cancer cohorts 
+(Bio-RAIDs and TCGA-CESC) to quantify the prognostic value of 
+biological pathways and assess the reproducibility of signals 
+beyond standard clinico-biological covariates.
 
 ## Prerequisites 
 
@@ -34,6 +59,10 @@ install_github(repo = "cwolock/survML")
 install.packages(c(
   "survival",
   "tidyverse",
+  "glmnet", 
+  "grpreg", 
+  "prioritylasso", 
+  "CoxBoost"
   "ranger",
   "xgboost", 
   "glmnet",
@@ -51,6 +80,7 @@ BiocManager::install("TCGAbiolinks")
 
 ## Overall analytical workflow
 
+![Overall analytical workflow](report_sources/images/analysis_workflow.png)
 
 ## Data access 
 
