@@ -80,7 +80,22 @@ BiocManager::install("TCGAbiolinks")
 
 ## Overall analytical workflow
 
-![Overall analytical workflow](report_sources/images/analysis_workflow.png)
+**1. Data collection:** Assemble cohort-specific clinical and molecular datasets and define the analysis population
+
+**2. Data preprocessing:** Process raw clinical and molecular data using standardized pipelines for both cohorts
+
+**3. Data integration:** Merge clinical, genomic, and transcriptomic datasets for harmonized analysis of both cohorts
+
+**4. Feature computation:** Aggregate gene-level RNA expression and summarize DNA alterations into pathway-level features
+
+**5. Statistical analysis:**  
+
+  * Descriptive analysis 
+  * Penalized Cox regression 
+  * Cox regression with likelihood-based boosting
+  * Variable importance analysis 
+
+**6. Cross-cohort comparison **
 
 ## Data access 
 
