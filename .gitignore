@@ -36,6 +36,7 @@ outputs/
 # Report sources
 # =========================
 
+*.bib
 *.yml
 report_sources/
 *_files/
