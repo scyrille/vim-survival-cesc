@@ -6,6 +6,7 @@
 .Ruserdata
 .Rproj.user/
 *.Rproj
+*.db
 
 # ======================
 # Data (critical)
