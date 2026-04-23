@@ -669,7 +669,9 @@ plot_venn_diagram_samples <- function(df, type) {
   
   sets <- purrr::map(
     groups,
-    ~ df %>% tidyr::drop_na(dplyr::all_of(.x)) %>% 
+    ~ df %>%
+      dplyr::select(patient_id, dplyr::all_of(unlist(unname(.x))))%>%
+      tidyr::drop_na() %>% 
       dplyr::pull(patient_id) %>% 
       unique()
   )
