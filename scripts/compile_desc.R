@@ -410,8 +410,8 @@ tbl_compare_global_test <-
                           function(x) paste(x, .y, sep = "_"))})%>%
   purrr::reduce(inner_join, by = "data_type")%>%
   gt::gt()%>%
-  gt::tab_spanner(label = gt::md("**Bio-RAIDs**"), columns = matches("Bio-RAIDs"))%>%
-  gt::tab_spanner(label = gt::md("**TCGA-CESC**"), columns = matches("TCGA"))%>%
+  gt::tab_spanner(label = gt::md("**Bio-RAIDs**"), columns = matches("raids"))%>%
+  gt::tab_spanner(label = gt::md("**TCGA-CESC**"), columns = matches("tcga"))%>%
   gt::cols_label(data_type = gt::md("**Data type**"), 
                  starts_with("x_cov")~ gt::md("**N.<br>features**"),
                  starts_with("statistic")~ gt::md("**Statistic**"),
