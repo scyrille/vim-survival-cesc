@@ -297,7 +297,12 @@ get_pathways_process <- function(){
     dplyr::arrange(process, label)%>%
     dplyr::mutate(num = 1:dplyr::n(), .before = variable)
   
-  dplyr::bind_rows(dna_pathways, rna_pathways) 
+  dplyr::bind_rows(dna_pathways, rna_pathways) %>%
+    dplyr::mutate(
+      variable_name = 
+        ifelse(data_type!="RNA_pathways", 
+               paste0("genomic_pathway_",  janitor::make_clean_names(variable)),
+               tolower(variable)))
 }
 
 #' Split a plot into predefined biological process panels
@@ -351,11 +356,11 @@ plot_process_panel <- function(df_long, fun, stats_df = NULL,
                                heights = c(1, 1), ...) {
   
   df_long <- df_long %>%
-    dplyr::left_join(get_pathways_process(), by = "variable")
+    dplyr::left_join(get_pathways_process(), by = "variable_name")
   
   if (!is.null(stats_df)) {
     stats_df <- stats_df %>%
-      dplyr::left_join(get_pathways_process(), by = "variable")
+      dplyr::left_join(get_pathways_process(), by = "variable_name")
   }
   
   df_p1 <- df_long %>%
@@ -451,18 +456,9 @@ plot_continuous <- function(df,
       dplyr::any_of(if (with_group) group_var),
       dplyr::all_of(vars)
     ) %>%
-    {
-      lab <- labelled::var_label(.[vars], unlist = TRUE)
-      
-      dplyr::rename_with(
-        .,
-        ~ dplyr::coalesce(lab[.x], .x),
-        .cols = dplyr::all_of(vars)
-      )
-    } %>%
     tidyr::pivot_longer(
       cols = -dplyr::any_of(if (with_group) group_var),
-      names_to = "variable",
+      names_to = "variable_name",
       values_to = "value"
     )
   
@@ -479,13 +475,13 @@ plot_continuous <- function(df,
                        legend.direction) {
     
     lab_map <- setNames(get_pathways_process()$label,
-                        get_pathways_process()$variable)
+                        get_pathways_process()$variable_name)
     
     if (with_group) {
       plot <- ggplot2::ggplot(
         df_long,
         ggplot2::aes(
-          x = .data[["variable"]],
+          x = .data[["variable_name"]],
           y = .data[["value"]],
           fill = .data[[group_var]]
         )
@@ -503,10 +499,11 @@ plot_continuous <- function(df,
       plot <- ggplot2::ggplot(
         df_long,
         ggplot2::aes(
-          x = .data[["variable"]],
+          x = .data[["variable_name"]],
           y = .data[["value"]]
         )
       ) +
+        ggplot2::scale_x_discrete(labels = lab_map) +
         ggplot2::geom_boxplot()
     }
     
@@ -597,16 +594,7 @@ plot_dichotomous <- function(df,
     dplyr::select(
       dplyr::any_of(if (with_group) group_var),
       dplyr::all_of(vars)
-    ) %>%
-    {
-      lab <- labelled::var_label(.[vars], unlist = TRUE)
-      
-      dplyr::rename_with(
-        .,
-        ~ dplyr::coalesce(lab[.x], .x),
-        .cols = dplyr::all_of(vars)
-      )
-    }
+    )
   
   value_vars <- setdiff(names(df_raw), if (with_group) group_var else character(0))
   
@@ -618,7 +606,7 @@ plot_dichotomous <- function(df,
     ) %>%
     tidyr::pivot_longer(
       cols = dplyr::all_of(value_vars),
-      names_to = "variable",
+      names_to = "variable_name",
       values_to = "value"
     )
   
@@ -628,12 +616,12 @@ plot_dichotomous <- function(df,
     df_test <- df_raw %>%
       tidyr::pivot_longer(
         cols = dplyr::all_of(value_vars),
-        names_to = "variable",
+        names_to = "variable_name",
         values_to = "value"
       )
     
     stats_df <- df_test %>%
-      dplyr::group_by(.data[["variable"]]) %>%
+      dplyr::group_by(.data[["variable_name"]]) %>%
       dplyr::summarise(
         pval = stats::fisher.test(table(.data[[group_var]], 
                                         .data[["value"]]))$p.value,
@@ -661,14 +649,14 @@ plot_dichotomous <- function(df,
                        legend.direction) {
     
     lab_map <- setNames(get_pathways_process()$label,
-                        get_pathways_process()$variable)
+                        get_pathways_process()$variable_name)
     
     if (with_group) {
       plot <- ggplot2::ggplot(
         df_long,
         ggplot2::aes(
           # x = stats::reorder(.data[["variable"]], .data[["value"]]),
-          x = .data[["variable"]],
+          x = .data[["variable_name"]],
           y = .data[["value"]],
           fill = .data[[group_var]]
         )
@@ -684,7 +672,7 @@ plot_dichotomous <- function(df,
         df_long,
         ggplot2::aes(
           # x = stats::reorder(.data[["variable"]], .data[["value"]]),
-          x = .data[["variable"]],
+          x = .data[["variable_name"]],
           y = .data[["value"]]
         )
       ) +
@@ -707,7 +695,7 @@ plot_dichotomous <- function(df,
         ggplot2::geom_text(
           data = stats_df,
           ggplot2::aes(
-            x = .data[["variable"]],
+            x = .data[["variable_name"]],
             y = 0.58,
             label = .data[["pval_stars"]]
           ),
