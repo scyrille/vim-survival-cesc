@@ -88,7 +88,7 @@
     "href": "presentation_EPICLIN_2026.html#importance-des-variables-généralisation-non-paramétrique-du-r2-williamson2020-1",
     "title": "vim-survival-cesc",
     "section": "Importance des variables : généralisation non paramétrique du \\(R^2\\) (Williamson et al. 2020)",
-    "text": "Importance des variables : généralisation non paramétrique du \\(R^2\\) (Williamson et al. 2020)\nFormulation générale au niveau de la population\n\nChoisir une mesure de performance prédictive : \\(V(f, P)\\)\nDéfinir :\n\n\\(\\mathcal{F}\\) : classe riche et flexible de fonctions reliant \\(X\\) à \\(Y\\)\n\\(\\mathcal{F_{-s}}\\) : classe riche et flexible de fonctions reliant \\(X_{_s}\\) à \\(Y\\)\n\nDéfinir les fonctions de prédiction oracle :\n\n\\(f_0 = \\arg\\max_{f \\in \\mathcal{F}} V(f, P_0)\\) : meilleur modèle possible dans \\(\\mathcal{F}\\)\n\\(f_{0,-s} = \\arg\\max_{f \\in \\mathcal{F}_{-s}} V(f, P_0)\\) : meilleur modèle possible dans \\(\\mathcal{F_{-s}}\\)\n\nDéfinir l’importance des variables au niveau de la population :\n\n\\[\n\\psi_{0,s}= V(f_0,P_0)-V(f_{0,-s}, P_0)\n\\]"
+    "text": "Importance des variables : généralisation non paramétrique du \\(R^2\\) (Williamson et al. 2020)\nFormulation générale au niveau de la population\n\nChoisir une mesure de performance prédictive : \\(V(f, P)\\)\nDéfinir :\n\n\\(\\mathcal{F}\\) : classe riche et flexible de fonctions reliant \\(X\\) à \\(Y\\)\n\\(\\mathcal{F_{-s}}\\) : classe riche et flexible de fonctions reliant \\(X_{-s}\\) à \\(Y\\)\n\nDéfinir les fonctions de prédiction oracle :\n\n\\(f_0 = \\arg\\max_{f \\in \\mathcal{F}} V(f, P_0)\\) : meilleur modèle possible dans \\(\\mathcal{F}\\)\n\\(f_{0,-s} = \\arg\\max_{f \\in \\mathcal{F}_{-s}} V(f, P_0)\\) : meilleur modèle possible dans \\(\\mathcal{F_{-s}}\\)\n\nDéfinir l’importance des variables au niveau de la population :\n\n\\[\n\\psi_{0,s}= V(f_0,P_0)-V(f_{0,-s}, P_0)\n\\]"
   },
   {
     "objectID": "presentation_EPICLIN_2026.html#importance-des-variables-généralisation-non-paramétrique-du-r2-williamson2020-2",
@@ -229,6 +229,27 @@
     "title": "vim-survival-cesc",
     "section": "Références",
     "text": "Références\n\n\n\nBrier, Glenn W. 1950. « Verification of forecasts expressed in terms of probability ». Monthly Weather Review 78 (1): 1‑3. https://doi.org/10.1175/1520-0493(1950)078&lt;0001:VOFEIT&gt;2.0.CO;2.\n\n\nHarrell, Jr, Frank E., Robert M. Califf, David B. Pryor, Kerry L. Lee, et Robert A. Rosati. 1982. « Evaluating the Yield of Medical Tests ». JAMA 247 (18): 2543‑46. https://doi.org/10.1001/jama.1982.03320430047030.\n\n\nHeagerty, Patrick J., et Yingye Zheng. 2005. « Survival Model Predictive Accuracy and ROC Curves ». Biometrics 61 (1): 92‑105. https://doi.org/10.1111/j.0006-341X.2005.030814.x.\n\n\nLaan, Mark J. van der, Eric C Polley, et Alan E. Hubbard. 2007. « Super Learner ». Statistical Applications in Genetics and Molecular Biology 6 (1). https://doi.org/doi:10.2202/1544-6115.1309.\n\n\nPolley, Eric C. 2010. « Super Learner In Prediction ». U.C. Berkeley Division of Biostatistics Working Paper Series. https://biostats.bepress.com/ucbbiostat/paper266.\n\n\nWilliamson, Brian D., Peter B. Gilbert, Marco Carone, et Noah Simon. 2020. « Nonparametric Variable Importance Assessment Using Machine Learning Techniques ». Biometrics 77 (1): 9‑22. https://doi.org/10.1111/biom.13392.\n\n\nWolock, C J, P B Gilbert, N Simon, et M Carone. 2024. « Assessing variable importance in survival analysis using machine learning ». Biometrika 112 (2): asae061. https://doi.org/10.1093/biomet/asae061.\n\n\nWolock, Charles J, Peter B Gilbert, Noah Simon, et Marco Carone. 2024. « A framework for leveraging machine learning tools to estimate personalized survival curves ». J. Comput. Graph. Stat. 33 (3): 1098‑108. https://doi.org/https://doi.org/10.1080/10618600.2024.2304070."
+  },
+  {
+    "objectID": "presentation_EPICLIN_2026.html#survival-stacking-illustration-sur-les-données-du-tcga",
+    "href": "presentation_EPICLIN_2026.html#survival-stacking-illustration-sur-les-données-du-tcga",
+    "title": "vim-survival-cesc",
+    "section": "Survival stacking : illustration sur les données du TCGA",
+    "text": "Survival stacking : illustration sur les données du TCGA\nOn définit une grille temporelle basée sur les temps d’événement observés\n\ntime_grid &lt;- c(0, sort(unique(time)))\nlength(time_grid)\n\n[1] 212\n\n\n\\(\\rightarrow\\) Au total, 212 temps d’événements observés"
+  },
+  {
+    "objectID": "presentation_EPICLIN_2026.html#survival-stacking-illustration-sur-les-données-du-tcga-1",
+    "href": "presentation_EPICLIN_2026.html#survival-stacking-illustration-sur-les-données-du-tcga-1",
+    "title": "vim-survival-cesc",
+    "section": "Survival stacking : illustration sur les données du TCGA",
+    "text": "Survival stacking : illustration sur les données du TCGA\nOn transforme le jeu de données en jeu de données empilé\n\ntcga_stacked &lt;- survML:::stack_cdf(time, X, time_grid)%&gt;%\n  dplyr::relocate(t, event_indicators)\ndim(tcga_stacked)\n\n[1] 48336    81\n\nlength(unique(tcga_stacked$t))\n\n[1] 212\n\n\n\\(\\rightarrow\\) 212 observations par sujets correspondant aux 212 temps d’événement observés"
+  },
+  {
+    "objectID": "presentation_EPICLIN_2026.html#survival-stacking-illustration-sur-les-données-du-tcga-2",
+    "href": "presentation_EPICLIN_2026.html#survival-stacking-illustration-sur-les-données-du-tcga-2",
+    "title": "vim-survival-cesc",
+    "section": "Survival stacking : illustration sur les données du TCGA",
+    "text": "Survival stacking : illustration sur les données du TCGA\nVisualisation du jeu de données transformé\n\nhead(tcga_stacked %&gt;% dplyr::filter(t == time_grid[1])%&gt;% dplyr::select(1:5))\n\n  t event_indicators age figo hpv_negative\n1 0                0   1    1            0\n2 0                0   0    0            0\n3 0                0   0    0            0\n4 0                0   1    0            0\n5 0                0   0    0            0\n6 0                0   0    1            0\n\nhead(tcga_stacked %&gt;% dplyr::filter(t == time_grid[90])%&gt;% dplyr::select(1:5))\n\n         t event_indicators age figo hpv_negative\n1 18.24638                0   1    1            0\n2 18.24638                0   0    0            0\n3 18.24638                0   0    0            0\n4 18.24638                0   1    0            0\n5 18.24638                1   0    0            0\n6 18.24638                0   0    1            0"
   },
   {
     "objectID": "presentation_EPICLIN_2026.html#génération-des-plis-de-cross-fitting-et-de-sample-splitting",
