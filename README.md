@@ -121,6 +121,10 @@ The Bio-RAIDs cohort consists of clinically annotated cervical cancer patients f
 * Access is subject to institutional agreements and data-sharing policies.
 * The data are **not distributed with this repository**.
 
+## Documentation
+
+A companion website is available at: **https://scyrille.github.io/vim-survival-cesc/**
+
 ## References 
 
 **Bio-RAIDs cohort**:
