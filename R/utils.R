@@ -460,16 +460,26 @@ combine_data <- function(raids, tcga){
 #'   are constructed by concatenating grouping values with `"_"`.
 #'
 #'@export
-group_split_custom <- function(df, ...) {
-  vars <- enquos(...)
-  df %>%
-    group_split(!!!vars, .keep = TRUE) %>%
-    set_names(
-      df %>%
-        distinct(!!!vars) %>%
-        mutate(name = apply(across(everything()), 1, paste, collapse = "_")) %>%
-        pull(name)
-    )
+group_split_custom <- function(df, ..., sep = "_") {
+  vars <- rlang::enquos(...)
+  
+  grouped_df <- df %>%
+    dplyr::group_by(!!!vars)
+  
+  groups <- grouped_df %>%
+    dplyr::group_split(.keep = TRUE)
+  
+  group_names <- grouped_df %>%
+    dplyr::group_keys() %>%
+    tidyr::unite(
+      col = ".group_name",
+      dplyr::everything(),
+      sep = sep,
+      remove = TRUE
+    ) %>%
+    dplyr::pull(.group_name)
+  
+  rlang::set_names(groups, group_names)
 }
 
 #' Retrieve variable labels from a dataset
@@ -593,12 +603,12 @@ save_plot <- function(plot, path, filename, width = 8, height = 6,
   
   # Define output file paths
   png_file <- file.path(path, paste0(filename, ".png"))
-  pdf_file <- file.path(path, paste0(filename, ".pdf"))
+  # pdf_file <- file.path(path, paste0(filename, ".pdf"))
   
   # Save PDF
-  pdf(pdf_file, width = width, height = height, ...)
-  print(plot, newpage = newpage)
-  dev.off()
+  # pdf(pdf_file, width = width, height = height, ...)
+  # print(plot, newpage = newpage)
+  # dev.off()
   
   # Save PNG
   png(png_file, width = width*res, height = height*res, unit = units, 
@@ -606,7 +616,9 @@ save_plot <- function(plot, path, filename, width = 8, height = 6,
   print(plot)
   dev.off()
   
-  message("Saved as:\n- ", png_file, "\n- ", pdf_file)
+  message("Saved as:\n- ", png_file#, 
+          #"\n- ", pdf_file
+          )
 }
 
 #' Plot a Venn diagram of patient/sample availability
