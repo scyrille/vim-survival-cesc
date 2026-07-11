@@ -6,16 +6,27 @@ source(here::here("R","features_pathways.R"))
 source(here::here("R","surv.R"))
 
 # Load data ----
-raids <- read_processed("raids")
-tcga <- read_processed("tcga")
-combined <- read_processed("combined")
+pathways_process <- get_pathways_process()
+labels <- setNames(as.list(pathways_process$label), 
+                   pathways_process$variable_name)
+
+data <- c("raids","tcga","combined")
+data %>%
+  purrr::map(~read_processed(.x))%>%
+  set_names(data)%>%
+  list2env(.GlobalEnv)
+
+labelled::var_label(raids$pathway$clin_dna_rna) <- labels
+labelled::var_label(tcga$pathway$clin_dna_rna) <- labels
+labelled::var_label(combined$pathway$clin_dna_rna) <- labels
+
 combined_sets <- list(
   clin           = combined$clin, 
   dna            = combined$clin %>% drop_na(dna),
   rna            = combined$clin %>% drop_na(rna),
-  clin_dna_rna   = combined$clin %>% drop_na(clin, dna, rna)
+  clin_dna_rna   = combined$clin %>% drop_na(clin, dna, rna) 
 )
-
+               
 ## Venn diagrams ----
 
 venn_diagram_sequencing <- combined$clin %>%
@@ -100,7 +111,8 @@ tbl_combined_pat_char <- combined$pathway$clin_dna_rna %>%
 
 ## Pathway-level frequencies of DNA alterations ----
 
-plot_dichotomous(df                = combined$pathway$clin_dna_rna,
+plot_dichotomous(df                = combined$pathway$clin_dna_rna %>%
+                   dplyr::select(-genomic_pathway_others),
                  var_prefix        = "genomic_pathway_",
                  with_group        = TRUE,
                  group_var         = "cohort",
@@ -214,6 +226,8 @@ tbl_compare_rna_pathways <- combined$pathway$clin_dna_rna %>%
   dplyr::select(cohort, starts_with("hallmark_"))%>%
   tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
   add_p(test = everything()~"wilcox.test")%>%
+  add_q(method = "BH")%>%
+  bold_p(q = TRUE)%>%
   modify_header(label = "")%>%
   bold_labels()
 
@@ -303,8 +317,6 @@ purrr::iwalk(
   }
 )
 
-## Association between DNA- and RNA-based pathways ----
-
 ## Association between RNA-based pathways ----
 
 combined$pathway$clin_dna_rna %>%
@@ -334,6 +346,16 @@ file.copy(here::here("outputs","figures",
           here::here("docs","articles","computers_in_biology_and_medicine", 
                      "Supplementary_Figure_S1.pdf"), 
           overwrite = TRUE)
+
+plot_surv(formula      = list(Surv(time, event) ~ cohort),
+          data         = combined$pathway$clin_dna_rna, 
+          pval         = T, 
+          xlim         = c(0,37),
+          risk.table   = "nrisk_cumevents",
+          legend.title = rep("", 4), 
+          palette      = c("#1b9e77","#377eb8"))%>%
+  save_plot(here::here("outputs","figures"),
+             "compare_surv_plot_clin_dna_rna_cohort_2", 6, 5.8, newpage = F)
 
 ## Progression-free survival on subsets defined by variables 
 combined$pathway$clin_dna_rna %>%
@@ -368,6 +390,7 @@ tbl_compare_surv <- combined_sets %>%
 
 # Cox proportional hazards models -----------------------------------------
 
+## Clinical features
 tbl_compare_cox_univ <- tbl_cox(
   data   = combined$pathway$clin_dna_rna,
   time   = "time",
@@ -430,14 +453,15 @@ tbl_compare_global_test <-
             ifelse(x < 0.001, "<0.001",
                    formatC(x, format = "f", digits = 2))))%>%
   gt::tab_source_note(
-    source_note = html(paste(
+    source_note = paste(
       "Clinical: clinical features",
       "DNA: gene-level DNA alterations features",
       "RNA: gene-level expression features",
       "DNA_pathways: DNA-based pathways features",
       "RNA_pathways: RNA-based pathways features",
-      sep = "<br>"))
-    )
+      sep = "; ")
+  )
+
 
 # ---------------------------- Save all tables --------------------------#
 
