@@ -487,12 +487,12 @@ plot_continuous <- function(df,
         )
       ) +
         ggplot2::geom_boxplot() +
-        ggpubr::stat_compare_means(
-          ggplot2::aes(group = .data[[group_var]]),
-          method = "wilcox.test",
-          label = "p.signif",
-          colour = "#F8766D"
-        ) +
+        # ggpubr::stat_compare_means(
+        #   ggplot2::aes(group = .data[[group_var]]),
+        #   method = "wilcox.test",
+        #   label = "p.signif",
+        #   colour = "#F8766D"
+        # ) +
         ggplot2::scale_x_discrete(labels = lab_map) +
         ggplot2::scale_fill_manual(values = fill_values)
     } else {
@@ -692,17 +692,17 @@ plot_dichotomous <- function(df,
       ymax <- max(df_long$value, na.rm = TRUE)
       
       plot <- plot +
-        ggplot2::geom_text(
-          data = stats_df,
-          ggplot2::aes(
-            x = .data[["variable_name"]],
-            y = 0.58,
-            label = .data[["pval_stars"]]
-          ),
-          inherit.aes = FALSE,
-          size = 6,
-          colour = "#F8766D"
-        ) +
+        # ggplot2::geom_text(
+        #   data = stats_df,
+        #   ggplot2::aes(
+        #     x = .data[["variable_name"]],
+        #     y = 0.58,
+        #     label = .data[["pval_stars"]]
+        #   ),
+        #   inherit.aes = FALSE,
+        #   size = 6,
+        #   colour = "#F8766D"
+        # ) +
         ggplot2::expand_limits(y = 0.6 * ymax)
     }
     

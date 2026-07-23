@@ -678,16 +678,16 @@ plot_vimp_est <- function(
           ),
           position = dodge,
           linewidth = 0.9
-        ) +
-        ggplot2::geom_text(
-          ggplot2::aes(
-            x = .data[["ciu"]],
-            label = .data[["p_val"]]
-          ),
-          hjust = -0.2,
-          size = 6,
-          colour = p_text_color
-        )
+        ) #+
+        # ggplot2::geom_text(
+        #   ggplot2::aes(
+        #     x = .data[["ciu"]],
+        #     label = .data[["p_val"]]
+        #   ),
+        #   hjust = -0.2,
+        #   size = 6,
+        #   colour = p_text_color
+        # )
     }
     
     plot <- plot +
@@ -753,16 +753,16 @@ plot_vimp_est <- function(
           position = dodge,
           linewidth = 0.4,
           colour = "black"
-        ) +
-        ggplot2::geom_text(
-          ggplot2::aes(
-            x = .data[["ciu"]],
-            label = .data[["p_val"]]
-          ),
-          hjust = -0.2,
-          size = 6,
-          colour = p_text_color
-        )
+        ) #+
+        # ggplot2::geom_text(
+        #   ggplot2::aes(
+        #     x = .data[["ciu"]],
+        #     label = .data[["p_val"]]
+        #   ),
+        #   hjust = -0.2,
+        #   size = 6,
+        #   colour = p_text_color
+        # )
     }
     
     plot <- plot +
@@ -980,7 +980,7 @@ tbl_vimp <- function(
       gt::tab_source_note(
         paste(
           c(
-            "VIM: variable importance measure",
+            "VIM: variable importance point estimate",
             "CI: confidence interval",
             "q-value: Benjamini–Hochberg-adjusted p-value"
           ),
@@ -1002,7 +1002,7 @@ tbl_vimp <- function(
         decimals = 3
       ) %>%
       gt::tab_source_note(
-        "VIM: variable importance measure"
+        "VIM: variable importance point estimate"
       )
   }
   
@@ -1077,7 +1077,8 @@ tbl_vimp <- function(
     dplyr::arrange(
       data_type,
       landmark_time
-    )
+    )%>%
+    dplyr::filter(!is.na(data_type))
   
   # ------------------------------------------------------------------#
   # Comparison tables: survML
@@ -1272,7 +1273,8 @@ tbl_vimp <- function(
 tbl_top10_vimp <- function(
     vims,
     compare = TRUE,
-    n_top = 10
+    n_top = 10,
+    digits = 3
 ) {
   
   # ------------------------------------------------------------------#
@@ -1348,7 +1350,8 @@ tbl_top10_vimp <- function(
     top_vims <- top_vims %>%
       dplyr::mutate(
         est_ci = sprintf(
-          "%.3f [%.3f–%.3f]",
+          paste0("%.",digits,"f [%.",digits,"f–%.",digits,"f]"),
+          # "%.3f [%.3f–%.3f]",
           est,
           cil_1sided,
           ciu
@@ -1385,7 +1388,7 @@ tbl_top10_vimp <- function(
   .survml_notes <- function(add_common_note = FALSE) {
     
     notes <- c(
-      "VIM: variable importance measure",
+      "VIM: variable importance point estimate",
       "CI: confidence interval",
       "q-value: Benjamini–Hochberg-adjusted p-value"
     )
@@ -1458,7 +1461,7 @@ tbl_top10_vimp <- function(
       ) %>%
       gt::fmt_number(
         columns = est,
-        decimals = 3
+        decimals = digits
       ) %>%
       gt::tab_source_note(
         .survex_notes(add_common_note)
@@ -1518,7 +1521,8 @@ tbl_top10_vimp <- function(
     dplyr::arrange(
       data_type,
       landmark_time
-    )
+    )%>%
+    dplyr::filter(!is.na(data_type))
   
   # ------------------------------------------------------------------#
   # Build one comparison table
@@ -1706,7 +1710,7 @@ tbl_top10_vimp <- function(
       gt::fmt_number(
         columns = gt::ends_with(c("_raids", "_tcga")) &
           gt::starts_with("est"),
-        decimals = 3
+        decimals = digits
       ) %>%
       gt::tab_source_note(
         .survex_notes(add_common_note)
