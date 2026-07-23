@@ -232,16 +232,49 @@ vimp_survML_base_est_split %>%
                                   "_panel"),
                            width[.y], height[.y]))
 
-list.files(here::here("outputs/figures"), 
-           pattern = "^compare_barplot_surv_vimp_base_est_.*panel\\.pdf$", 
-           full.names = T)%>%
-  sort()%>%
-  purrr::iwalk(~{
-    new_name <- file.path(here::here("docs/articles", 
-                                     "computers_in_biology_and_medicine"), 
-                          paste0("Figure_", .y+1, ".pdf"))
-    file.copy(.x, new_name, overwrite = TRUE)
-  })
+# for (i in seq_along(vimp_survML_base_est_split)){
+#   jpeg(
+#     filename = paste0(
+#       here::here("docs","articles","briefings_in_bioinformatics"),
+#       "/Figure_",1+i,"_revised.jpg"),
+#     width = width[i]*300, height = height[i]*300, units = "px", 
+#     res = 300, quality = 100
+#   )
+#   plot_vimp_est(
+#     vimp_survML_base_est_split[[i]],
+#     ylab   = "",
+#     type   = "barplot",
+#     process_panel = process_panel[i], 
+#     fill_by = "cohort",
+#     fill_label = ""
+#   )
+#   dev.off()
+# }
+
+# vimp_survML_base_est_split %>%
+#   purrr::imap(~ plot_vimp_est(
+#     .x,
+#     ylab   = "",
+#     type   = "barplot",
+#     process_panel = process_panel[.y], 
+#     fill_by = "cohort",
+#     fill_label = ""
+#   )) %>%
+#   purrr::iwalk(~ save_plot(.x, here::here("outputs","figures"),
+#                            paste0("compare_barplot_surv_vimp_base_est_", .y,
+#                                   "_panel"),
+#                            width[.y], height[.y]))
+# 
+# list.files(here::here("outputs/figures"), 
+#            pattern = "^compare_barplot_surv_vimp_base_est_.*panel\\.pdf$", 
+#            full.names = T)%>%
+#   sort()%>%
+#   purrr::iwalk(~{
+#     new_name <- file.path(here::here("docs/articles", 
+#                                      "computers_in_biology_and_medicine"), 
+#                           paste0("Figure_", .y+1, ".pdf"))
+#     file.copy(.x, new_name, overwrite = TRUE)
+#   })
 
 vimp_survML_base_est_split %>%
   purrr::imap(~ plot_vimp_est(
@@ -258,13 +291,13 @@ vimp_survML_base_est_split %>%
                            width[.y], height[.y]))
 
 # Summary table of all pathways  
-tbl_vimp_survML_base_all <- tbl_vimp(
+tbl_compare_vimp_survML_base_all <- tbl_vimp(
   vims    = vimp_survML_base_est,
   compare = TRUE
 )
 
 # Summary table of top-10 ranked pathways
-tbl_vimp_survML_base_top10 <- tbl_top10_vimp(
+tbl_compare_vimp_survML_base_top10 <- tbl_top10_vimp(
   vims    = vimp_survML_base_est,
   compare = TRUE,
   n_top   = 10
@@ -278,7 +311,7 @@ tbl_cox_univ_survML_base_top10 <- tbl_cox_univ_top10_vimp(
 )
   
 # Cross-cohort comparison 
-tbl_vimp_survML_top_overlap <- c(5,10,20) %>%
+tbl_vimp_survML_base_top_overlap <- c(5,10,20) %>%
   purrr::map(~tbl_top_overlap_vimp(vims = vimp_survML_base_est, k = .x))%>%
   set_names(paste0("top-", c(5,10,20)))
 
@@ -383,13 +416,48 @@ combined_figo <- combined %>%
   group_split_custom(figo_c_f)%>%
   purrr::set_names(janitor::make_clean_names(names(.)))
 
-tbl_cox_univ_survML_base_top10 <- combined_vimp_survML_base_est %>%
+tbl_combined_cox_univ_survML_base_top10 <- combined_vimp_survML_base_est %>%
   purrr::imap(~tbl_cox_univ_top10_vimp(
     vims    = .x,
     data    = combined_figo[[.y]], 
     compare = FALSE
 ))%>%
   purrr::list_flatten()
+
+# ranger: permutation importance ------------------------------------------
+
+# Load all results 
+vimp_ranger_fit <- cohorts %>%
+  purrr::map(~readRDS(here::here("outputs","results",
+                                 paste0(.x,"_vimp_ranger_fit.rds"))))%>%
+  set_names(cohorts_name)
+
+vimp_ranger_est <- vimp_ranger_fit %>%
+  purrr::imap(~data.frame(.x$variable.importance)%>%
+                tibble::rownames_to_column()%>%
+                set_names(c("variable_name","est"))%>%
+                dplyr::mutate(cohort = .y,
+                              landmark_time = 0)%>%
+                dplyr::left_join(pathways_process %>% 
+                                   dplyr::select(data_type, label, variable_name), 
+                                 by = c("variable_name"))%>%
+                dplyr::mutate(data_type = tolower(data_type),
+                              variable = label))%>%
+  bind_rows()
+
+# Summary table of all pathways  
+tbl_vimp_ranger_est_all <- tbl_vimp(
+  vims    = vimp_ranger_est,
+  compare = TRUE
+)
+
+# Summary table of top-10 ranked pathways
+tbl_vimp_ranger_top10 <- tbl_top10_vimp(
+  vims    = vimp_ranger_est,
+  compare = TRUE,
+  n_top   = 10,
+  digits  = 4
+)
 
 # survex: variable importance with explainable machine learning -----------
 
@@ -425,7 +493,8 @@ cowplot::plot_grid(plotlist = vimp_survex_fit %>%
          title = y, 
          subtitle = "", 
          max_vars = 10)+
-      scale_y_continuous(limits = c(-0.2,0.2))+
+      scale_y_continuous(limits = c(-0.075,0.075))+
+      scale_x_continuous(limits = c(0,40))+
       labs(x = "Time in months")
   }), nrow = 2)%>%
   save_plot(here::here("outputs","figures"), "compare_survex_vimp_est_dna_pathways",
@@ -440,7 +509,8 @@ cowplot::plot_grid(plotlist = vimp_survex_fit %>%
                             title = y, 
                             subtitle = "", 
                             max_vars = 10)+
-                         scale_y_continuous(limits = c(-0.2,0.2))+
+                         scale_y_continuous(limits = c(-0.12,0.12))+
+                         scale_x_continuous(limits = c(0,40))+
                          labs(x = "Time in months")
                      }), nrow = 2)%>%
   save_plot(here::here("outputs","figures"), "compare_survex_vimp_est_rna_pathways",
@@ -459,7 +529,8 @@ cowplot::plot_grid(
            title = y,    
            subtitle = "", 
            max_vars = 10)+
-        scale_y_continuous(limits = c(-0.2,0.2))+
+        scale_y_continuous(limits = c(-0.075,0.075))+
+        scale_x_continuous(limits = c(0,40))+
         labs(x = "Time in months")
       }), nrow = 2)%>%
   save_plot(here::here("outputs","figures"), "compare_survex_vimp_est_dna_processes",
@@ -478,7 +549,8 @@ cowplot::plot_grid(
            title = y,    
            subtitle = "", 
            max_vars = 10)+
-        scale_y_continuous(limits = c(-0.2,0.2))+
+        scale_y_continuous(limits = c(-0.16,0.16))+
+        scale_x_continuous(limits = c(0,40))+
         labs(x = "Time in months")
     }), nrow = 2)%>%
   save_plot(here::here("outputs","figures"), "compare_survex_vimp_est_rna_processes",
@@ -497,7 +569,10 @@ vimp_survex_est_split <- vimp_survex_est %>%
 width <- set_names(c(20,9,23,9), names(vimp_survex_est_split))
 height <- set_names(c(15,5,20,5), names(vimp_survex_est_split))
 process_panel <- set_names(c(T,F,T,F), names(vimp_survex_est_split))
-
+limits <- set_names(list(c(0, 0.004),
+                         c(0, 0.007), 
+                         c(0, 0.03),
+                         c(0, 0.12)), names(vimp_survex_est_split))
 vimp_survex_est_split %>%
   purrr::imap(~ plot_vimp_est(
     .x,
@@ -508,7 +583,7 @@ vimp_survex_est_split %>%
     process_panel = process_panel[.y], 
     fill_by = "cohort",
     fill_label = "",
-    limits = c(0, 0.15),
+    limits = limits[[.y]],
   )) %>%
   purrr::iwalk(~ save_plot(.x, here::here("outputs","figures"),
                            paste0("compare_barplot_survex_vimp_base_est_", .y,
@@ -524,7 +599,7 @@ vimp_survex_est_split %>%
     method = "survex",
     fill_by = "cohort",
     fill_label = "",
-    limits = c(0, 0.15)
+    limits = limits[[.y]]
   )) %>%
   purrr::iwalk(~ save_plot(.x, here::here("outputs","figures"),
                            paste0("compare_dotplot_survex_vimp_base_est_", .y, 

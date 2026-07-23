@@ -333,10 +333,10 @@ combined$pathway$clin_dna_rna %>%
 combined_sets %>%
   plot_surv(formula      = Surv(time, event) ~ cohort,
             data         = ., 
-            pval         = T, 
             # legend.title = rep("Cohort", 4), 
             legend.title = rep("", 4), 
-            palette      = c("#1b9e77","#377eb8"))%>%
+            palette      = c("#1b9e77","#377eb8"),
+            pval         = FALSE)%>%
   iwalk(~save_plot(., here::here("outputs","figures"),
                    paste0("compare_surv_plot_", .y),
                    6, 5.8, newpage = F))
@@ -349,7 +349,7 @@ file.copy(here::here("outputs","figures",
 
 plot_surv(formula      = list(Surv(time, event) ~ cohort),
           data         = combined$pathway$clin_dna_rna, 
-          pval         = T, 
+          pval         = FALSE, 
           xlim         = c(0,37),
           risk.table   = "nrisk_cumevents",
           legend.title = rep("", 4), 
