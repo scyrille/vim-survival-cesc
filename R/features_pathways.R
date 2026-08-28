@@ -169,6 +169,13 @@ compute_gsva <- function(gene_expression,
   #'The output is a gene set by sample matrix of GSVA scores.
   #'Let's perform GSVA using the `gsva()` function.
   
+  pathway_labels <- get_pathways_process()%>%
+    dplyr::filter(data_type == "RNA_pathways")%>%
+    dplyr::select(variable_name, label)%>%
+    dplyr::mutate(variable_name = toupper(variable_name))%>%
+    tibble::deframe() %>%
+    as.list()
+  
   gsvaParam <- GSVA::gsvaParam(exprData = gene_expression_matrix,
                                geneSets = hallmarks_gene,
                                kcdf = "Gaussian")
@@ -178,7 +185,7 @@ compute_gsva <- function(gene_expression,
     tidyr::pivot_longer(-hallmark_pathway, names_to = "patient_id")%>%
     tidyr::pivot_wider(names_from = hallmark_pathway, 
                        values_from = value)%>%
-    labelled::set_variable_labels(.labels = names(.))%>%
+    labelled::set_variable_labels(.labels = pathway_labels)%>%
     janitor::clean_names()%>%
     dplyr::mutate(cohort = cohort_name, .before = patient_id)
 }

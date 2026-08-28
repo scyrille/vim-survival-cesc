@@ -156,8 +156,6 @@ import_raids <- function(raw_dir = "data/raw/raids"){
     here::here(clin_dir, 
               "Evaluation RAIDS project LNS_01042021_fichier propre_01042021_LLC.xlsx")
     )
-  load(here::here(clin_dir, "BIORAID_20210108.Rdata"))
-
   
   # Genomic data (WES, sWGS) 
   dna_dir <- here::here(raw_dir, "genomic_data")

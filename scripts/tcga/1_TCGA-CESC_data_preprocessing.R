@@ -75,7 +75,8 @@ tcga_clin_stand <- standardize_clin(
   age_col        = "age_at_initial_pathologic_diagnosis", 
   figo_col       = "clinical_stage", 
   hpv_col        = "hpv_status", 
-  histo_col      = "histological_type")
+  histo_col      = "histological_type"
+)
 
 # Prepare molecular data --------------------------------------------------
 
@@ -88,16 +89,17 @@ tcga_cnv <- process_tcga_cnv(tcga_raw$CNVs)$gene_status
 tcga_dna_processed <- process_tcga_dna(tcga_snv, tcga_cnv)
 
 tcga_dna <- tcga_dna_processed %>%
-  pivot_wider_dna(mut_key             = "dna_pathway_long",
-                  cohort_name         = "TCGA-CESC",
-                  gene_col            = "gene_name",
-                  id_col              = "bcr_patient_barcode",
-                  altered_col         = "altered_gene",
-                  cnv_col             = "cnv",
-                  snv_col             = "snv", 
-                  fusion_col          = NULL,
-                  pathway_col         = "pathway",
-                  altered_pathway_col = "altered_pathway")
+  pivot_wider_dna(
+    mut_key             = "dna_pathway_long",
+    cohort_name         = "TCGA-CESC",
+    gene_col            = "gene_name",
+    id_col              = "bcr_patient_barcode",
+    altered_col         = "altered_gene",
+    cnv_col             = "cnv",
+    snv_col             = "snv", 
+    fusion_col          = NULL,
+    pathway_col         = "pathway"
+  )
 
 ## Transcriptomic data ----
 

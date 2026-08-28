@@ -48,6 +48,8 @@ vimp_survML_full_fit_runtime <- as.numeric(difftime(end, start, units = "mins"))
 
 # VIM relative to clinical features ---------------------------------------
 
+## Main analysis ----
+
 #' Estimating variable importance relative to base model
 #' 
 #' We consider the importance of each molecular feature relative to a 
@@ -76,6 +78,103 @@ vimp_survML_base_fit <- compute_vimp_survML_base(
   )
 end <- Sys.time()
 vimp_survML_base_fit_runtime <- 
+  as.numeric(difftime(end, start, units = "mins"))
+
+## Sensitivity analyses ----
+
+SL.library <- make_SL_library()
+
+### Adjustment on genomic alteration burden ----
+input_survML_base_sens1_adj_fit <- tcga$pathway$clin_dna_rna %>%
+  make_input_vimp_survML_base(
+    var_clin = c("age","hpv_negative","figo",
+                 "genomic_pathway_alteration_burden"),
+    dna_prefix = "genomic_pathway_",
+    dna_suffix = "any_gene", 
+    rna_prefix = ""
+  )%>%
+  purrr::modify_in(
+    "feature_groups",
+    ~ purrr::discard(
+      .x,
+      ~ length(.x) == 0L || identical(.x, "")
+    )
+  )
+
+start <- Sys.time()
+vimp_survML_base_sens1_adj_fit <- compute_vimp_survML_base(
+  time           = input_survML_base_sens1_adj_fit$time,
+  event          = input_survML_base_sens1_adj_fit$event,
+  X              = input_survML_base_sens1_adj_fit$X,
+  base_features  = input_survML_base_sens1_adj_fit$base_features, 
+  feature_groups = input_survML_base_sens1_adj_fit$feature_groups, 
+  SL.library     = SL.library,
+  seed           = 123 
+)
+end <- Sys.time()
+vimp_survML_base_sens1_adj_fit_runtime <- 
+  as.numeric(difftime(end, start, units = "mins"))
+
+### Alternative DNA pathway definitions ----
+
+# At least two altered genes 
+input_survML_base_sens2_two_genes_fit <- tcga$pathway$clin_dna_rna %>%
+  make_input_vimp_survML_base(
+    var_clin = c("age","hpv_negative","figo"),
+    dna_prefix = "genomic_pathway_",
+    dna_suffix = "two_genes", 
+    rna_prefix = ""
+  )%>%
+  purrr::modify_in(
+    "feature_groups",
+    ~ purrr::discard(
+      .x,
+      ~ length(.x) == 0L || identical(.x, "")
+    )
+  )
+
+start <- Sys.time()
+vimp_survML_base_sens2_two_genes_fit <- compute_vimp_survML_base(
+  time           = input_survML_base_sens2_two_genes_fit$time,
+  event          = input_survML_base_sens2_two_genes_fit$event,
+  X              = input_survML_base_sens2_two_genes_fit$X,
+  base_features  = input_survML_base_sens2_two_genes_fit$base_features, 
+  feature_groups = input_survML_base_sens2_two_genes_fit$feature_groups, 
+  SL.library     = SL.library,
+  seed           = 123 
+)
+end <- Sys.time()
+vimp_survML_base_sens2_two_genes_fit_runtime <- 
+  as.numeric(difftime(end, start, units = "mins"))
+
+# Proportion of constituent altered genes 
+input_survML_base_sens3_prop_fit <- tcga$pathway$clin_dna_rna %>%
+  make_input_vimp_survML_base(
+    var_clin = c("age","hpv_negative","figo"),
+    dna_prefix = "genomic_pathway_",
+    dna_suffix = "prop", 
+    rna_prefix = ""
+  )%>%
+  purrr::modify_in(
+    "feature_groups",
+    ~ purrr::discard(
+      .x,
+      ~ length(.x) == 0L || identical(.x, "")
+    )
+  )
+
+start <- Sys.time()
+vimp_survML_base_sens3_prop_fit <- compute_vimp_survML_base(
+  time           = input_survML_base_sens3_prop_fit$time,
+  event          = input_survML_base_sens3_prop_fit$event,
+  X              = input_survML_base_sens3_prop_fit$X,
+  base_features  = input_survML_base_sens3_prop_fit$base_features, 
+  feature_groups = input_survML_base_sens3_prop_fit$feature_groups, 
+  SL.library     = SL.library,
+  seed           = 123 
+)
+end <- Sys.time()
+vimp_survML_base_sens3_prop_fit_runtime <- 
   as.numeric(difftime(end, start, units = "mins"))
 
 # ---------------------------- Save all results -------------------------#

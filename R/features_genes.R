@@ -70,10 +70,6 @@ library(labelled)
 #' @param pathway_col A character string specifying the column containing DNA
 #'   pathway names. Default is `"pathway"`.
 #'
-#' @param altered_pathway_col A character string specifying the column
-#'   containing the binary indicator of pathway-level alteration. Default is
-#'   `"altered_pathway"`.
-#'
 #' @return A tibble in wide format with:
 #' \itemize{
 #'   \item one row per patient,
@@ -98,8 +94,7 @@ pivot_wider_dna <- function(df,
                             cnv_col = "cnv",
                             snv_col = "snv", 
                             fusion_col = "fusion",
-                            pathway_col = "pathway",
-                            altered_pathway_col = "altered_pathway"){
+                            pathway_col = "pathway"){
   
   if (cohort_name=="Bio-RAIDs"){
     # HRD 
@@ -183,24 +178,67 @@ pivot_wider_dna <- function(df,
       dplyr::rename_with(~ paste0("sig_group_", .x), -dplyr::all_of(id_col))
   }
   
+  # Genomic alteration burden 
+  alteration_burden <- mut %>%
+    dplyr::select(dplyr::all_of(c(id_col, pathway_col, altered_col))) %>%
+    dplyr::distinct() %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(id_col))) %>%
+    dplyr::summarise(
+      genomic_pathway_alteration_burden = sum(.data[[altered_col]], 
+                                              na.rm = TRUE),
+      .groups = "drop"
+    )%>%
+    labelled::set_variable_labels(
+      genomic_pathway_alteration_burden = "Genomic alteration burden"
+    )
+  
   # DNA pathways 
-  pathways_sort <- c(sort(unique(mut$pathway))%>% subset(.!="Others "),
-                     "Others ")
+  ## Four definitions : 
+  ## 1. At least one altered gene
+  ## 2. At least two altered genes 
+  ## 3. Number of altered genes
+  ## 4. Proportion of altered genes
+  pathway_labels <- get_pathways_process()%>%
+    dplyr::filter(data_type == "DNA_pathways")%>%
+    dplyr::select(variable_name, label)%>%
+    tibble::deframe() %>%
+    as.list()
+  
   dna_pathway <- mut %>%
-    dplyr::select(dplyr::all_of(c(id_col, pathway_col, altered_pathway_col))) %>%
-    dplyr::distinct()%>% 
-    tidyr::pivot_wider(names_from = dplyr::all_of(pathway_col),
-                       values_from = dplyr::all_of(altered_pathway_col)) %>%
-    labelled::set_variable_labels(.labels = trimws(names(.)))%>%
-    dplyr::relocate(all_of(id_col), all_of(pathways_sort))%>%
-    janitor::clean_names() %>%
-    dplyr::rename_with(~ paste0("genomic_pathway_", .x), 
-                       -dplyr::all_of(id_col)) 
+    dplyr::select(dplyr::all_of(c(id_col, gene_col, pathway_col, altered_col))) %>%
+    dplyr::distinct() %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(c(id_col, pathway_col)))) %>%
+    dplyr::summarize(
+      any_gene = as.integer(sum(.data[[altered_col]], na.rm = TRUE)>=1),
+      two_genes = as.integer(sum(.data[[altered_col]], na.rm = TRUE)>=2),
+      count = sum(.data[[altered_col]], na.rm = TRUE),
+      prop = mean(.data[[altered_col]], na.rm = TRUE),
+      .groups = "drop"
+    )%>%
+    tidyr::pivot_wider(
+      names_glue = paste0("genomic_pathway_{", pathway_col, "}_{.value}"),
+      id_cols = dplyr::all_of(id_col),
+      names_from = dplyr::all_of(pathway_col),
+      values_from = c(any_gene, two_genes, count, prop),
+      names_sep = "_",
+      values_fill = 0
+    ) %>%
+    janitor::clean_names()%>%
+    labelled::set_variable_labels(
+      .labels = c(
+        pathway_labels %>% purrr::set_names(paste0(names(.), "_any_gene")),
+        pathway_labels %>% purrr::set_names(paste0(names(.), "_two_genes")),
+        pathway_labels %>% purrr::set_names(paste0(names(.), "_count")),
+        pathway_labels %>% purrr::set_names(paste0(names(.), "_prop"))
+      )
+    )
   
   if (cohort_name=="Bio-RAIDs"){
-    list_df <- list(hrd, tmb_msi, altered, cnv, snv, fusion, sig, dna_pathway)
+    list_df <- list(hrd, tmb_msi, altered, cnv, snv, fusion, sig, 
+                    alteration_burden, dna_pathway)
   } else if (cohort_name=="TCGA-CESC"){
-    list_df <- list(altered, cnv, snv, dna_pathway)
+    list_df <- list(altered, cnv, snv, 
+                    alteration_burden, dna_pathway)
   }
   
   list_df %>%

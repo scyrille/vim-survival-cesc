@@ -65,7 +65,8 @@ raids_clin_stand <- standardize_clin(
   figo_col       = "figo_18_4_classes", 
   hpv_col        = "hpv", 
   histo_col      = "type_histo_4_classes",
-  necrosis_col   = "necrosis_in_percent_of_total_area")
+  necrosis_col   = "necrosis_in_percent_of_total_area"
+)
 
 # Prepare molecular data --------------------------------------------------
 
@@ -74,16 +75,17 @@ raids_clin_stand <- standardize_clin(
 ### Gene-level and pathway-level data 
 
 raids_dna <- raids_temp %>%
-  pivot_wider_dna(mut_key             = "mut_wes_raw",
-                  cohort_name         = "Bio-RAIDs",
-                  gene_col            = "gene",
-                  id_col              = "patient_id",
-                  altered_col         = "altered_gene",
-                  cnv_col             = "cnv",
-                  snv_col             = "snv", 
-                  fusion_col          = "fusion",
-                  pathway_col         = "pathway",
-                  altered_pathway_col = "altered_pathway")
+  pivot_wider_dna(
+    mut_key             = "mut_wes_raw",
+    cohort_name         = "Bio-RAIDs",
+    gene_col            = "gene",
+    id_col              = "patient_id",
+    altered_col         = "altered_gene",
+    cnv_col             = "cnv",
+    snv_col             = "snv", 
+    fusion_col          = "fusion",
+    pathway_col         = "pathway"
+  )
 
 ## Transcriptomic data ----
 
