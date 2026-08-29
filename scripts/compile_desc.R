@@ -109,11 +109,24 @@ tbl_combined_pat_char <- combined$pathway$clin_dna_rna %>%
       modify_footnote(everything() ~ NA)
   )
 
+## Genomic alteration burden ----
+
+tbl_compare_dna_burden <- combined$pathway$clin_dna_rna %>%
+  dplyr::select(cohort, genomic_pathway_alteration_burden)%>%
+  tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
+  add_p(test = everything()~"fisher.test")%>%
+  modify_header(label = "")%>%
+  bold_labels()
+
 ## Pathway-level frequencies of DNA alterations ----
 
+### Main definition ----
+
+# Without panels
 plot_dichotomous(df                = combined$pathway$clin_dna_rna %>%
                    dplyr::select(-genomic_pathway_others),
                  var_prefix        = "genomic_pathway_",
+                 var_suffix        = "any_gene", 
                  with_group        = TRUE,
                  group_var         = "cohort",
                  xlab              = "",
@@ -126,8 +139,10 @@ plot_dichotomous(df                = combined$pathway$clin_dna_rna %>%
   save_plot(here::here("outputs","figures"), 
             "compare_barplot_dna_pathways", 12, 12)
 
+# With panels 
 plot_dichotomous(df                = combined$pathway$clin_dna_rna,
                  var_prefix        = "genomic_pathway_",
+                 var_suffix        = "any_gene", 
                  with_group        = TRUE,
                  group_var         = "cohort",
                  xlab              = "",
@@ -140,31 +155,17 @@ plot_dichotomous(df                = combined$pathway$clin_dna_rna,
   save_plot(here::here("outputs","figures"), 
             "compare_barplot_dna_pathways_panel", 23, 18)
 
-pdf(here::here("docs","articles","computers_in_biology_and_medicine", 
-               "Supplementary_Figure_S2.pdf"), width = 23, height = 16,
-    onefile = F)
-plot_dichotomous(df                = combined$pathway$clin_dna_rna,
-                 var_prefix        = "genomic_pathway_",
-                 with_group        = TRUE,
-                 group_var         = "cohort",
-                 xlab              = "",
-                 ylab              = "Pathway alteration frequency",
-                 fill_values       = c("Bio-RAIDs" = "#1b9e77",
-                                       "TCGA-CESC" = "#377eb8"),
-                 legend.position   = "top",
-                 legend.direction  = "horizontal",
-                 process_panel     = T)
-dev.off()
-
 tbl_compare_dna_pathways <- combined$pathway$clin_dna_rna %>%
-  dplyr::select(cohort, starts_with("genomic_pathway"))%>%
+  dplyr::select(cohort, starts_with("genomic_pathway") & 
+                  ends_with("any_gene"))%>%
   tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
   add_p(test = everything()~"fisher.test")%>%
   modify_header(label = "")%>%
   bold_labels()
 
 tbl_combined_dna_pathways <- combined$pathway$clin_dna_rna %>%
-  dplyr::select(cohort, figo_c_f, starts_with("genomic_pathway"))%>%
+  dplyr::select(cohort, figo_c_f, starts_with("genomic_pathway") & 
+                  ends_with("any_gene"))%>%
   tbl_strata(
     strata = figo_c_f,
     .header = c("**FIGO stage {strata}**<br>N = {n}"), 
@@ -174,10 +175,47 @@ tbl_combined_dna_pathways <- combined$pathway$clin_dna_rna %>%
       modify_header(label = "")%>%
       bold_labels()%>%
       add_overall()
-    )
+  )
+
+### Other definitions ----
+tbl_compare_dna_pathways_two_genes <- combined$pathway$clin_dna_rna %>%
+  dplyr::select(cohort, starts_with("genomic_pathway") & 
+                  ends_with("two_genes"))%>%
+  tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
+  add_p(test = everything()~"fisher.test")%>%
+  modify_header(label = "")%>%
+  bold_labels()
+
+# tbl_compare_dna_pathways_count <- combined$pathway$clin_dna_rna %>%
+#   dplyr::select(cohort, starts_with("genomic_pathway") &
+#                   ends_with("count"))%>%
+#   tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
+#   add_p(test = everything()~"fisher.test")%>%
+#   modify_header(label = "")%>%
+#   bold_labels()
+
+tbl_compare_dna_pathways_prop <- combined$pathway$clin_dna_rna %>%
+  dplyr::select(cohort, starts_with("genomic_pathway") & 
+                  ends_with("prop"))%>%
+  tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
+  add_p(test = everything()~"fisher.test")%>%
+  modify_header(label = "")%>%
+  bold_labels()
+
+tbl_compare_dna_pathways_all <- list(
+  tbl_compare_dna_pathways, 
+  tbl_compare_dna_pathways_two_genes,
+  # tbl_compare_dna_pathways_count,
+  tbl_compare_dna_pathways_prop
+)%>%
+  tbl_merge(tab_spanner = c("**Any gene**",
+                            "**At least two genes**",
+                            # "**Number of constituent altered genes**", 
+                            "**Proportion of constituent altered genes**"))
 
 ## RNA-based pathway activity scores ----
 
+# Without panels
 plot_continuous(combined$pathway$clin_dna_rna,
                 var_prefix = "hallmark_",
                 with_group = TRUE,
@@ -192,6 +230,7 @@ plot_continuous(combined$pathway$clin_dna_rna,
   save_plot(here::here("outputs","figures"), 
             "compare_boxplot_rna_pathways", 15, 20)
 
+# With panels
 plot_continuous(combined$pathway$clin_dna_rna,
                 var_prefix = "hallmark_",
                 with_group = TRUE,
@@ -205,22 +244,6 @@ plot_continuous(combined$pathway$clin_dna_rna,
                 process_panel = T)%>%
   save_plot(here::here("outputs","figures"), 
             "compare_boxplot_rna_pathways_panel", 24, 20, newpage = F)
-
-pdf(here::here("docs","articles","computers_in_biology_and_medicine", 
-               "Supplementary_Figure_S3.pdf"), width = 24, height = 20,
-    onefile = F)
-plot_continuous(combined$pathway$clin_dna_rna,
-                var_prefix = "hallmark_",
-                with_group = TRUE,
-                group_var = "cohort",
-                xlab = "",
-                ylab = "Pathway-activity score",
-                fill_values = c("Bio-RAIDs" = "#1b9e77",
-                                "TCGA-CESC" = "#377eb8"),
-                legend.position = "top",
-                legend.direction = "horizontal",
-                process_panel = T)
-dev.off()
 
 tbl_compare_rna_pathways <- combined$pathway$clin_dna_rna %>%
   dplyr::select(cohort, starts_with("hallmark_"))%>%
@@ -341,12 +364,7 @@ combined_sets %>%
                    paste0("compare_surv_plot_", .y),
                    6, 5.8, newpage = F))
 
-file.copy(here::here("outputs","figures", 
-                     "compare_surv_plot_clin_dna_rna_cohort.pdf"), 
-          here::here("docs","articles","computers_in_biology_and_medicine", 
-                     "Supplementary_Figure_S1.pdf"), 
-          overwrite = TRUE)
-
+# With longer follow-up
 plot_surv(formula      = list(Surv(time, event) ~ cohort),
           data         = combined$pathway$clin_dna_rna, 
           pval         = FALSE, 
@@ -356,6 +374,28 @@ plot_surv(formula      = list(Surv(time, event) ~ cohort),
           palette      = c("#1b9e77","#377eb8"))%>%
   save_plot(here::here("outputs","figures"),
              "compare_surv_plot_clin_dna_rna_cohort_2", 6, 5.8, newpage = F)
+
+# With survival tables 
+pfs_surv_plots <- combined_sets %>%
+  purrr::map(
+    ~.x %>%
+      plot_surv_table(
+        formula      = Surv(time, event) ~ cohort,
+        data         = .x, 
+        palette = c("#1b9e77","#377eb8")
+      )
+    )
+
+for (i in seq_along(pfs_surv_plots)){
+  png(here::here("outputs","figures", 
+                 paste0("compare_surv_plot_",
+                        names(pfs_surv_plots)[[i]], 
+                        "_cohort_table.png")), 
+      width = 5.6*330, height = 4.2*330, res = 300)
+  grid::grid.newpage()
+  grid::grid.draw(pfs_surv_plots[[i]][["grob"]])
+  dev.off()
+}
 
 ## Progression-free survival on subsets defined by variables 
 combined$pathway$clin_dna_rna %>%

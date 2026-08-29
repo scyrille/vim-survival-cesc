@@ -128,6 +128,501 @@ plot_surv <- function(formula,
   plot
 }
 
+plot_surv_table <- function(
+    formula,
+    data,
+    title = "",
+    legend = "top",
+    legend.title = "",
+    xlab = "Time in months",
+    ylab = "Progression-free survival",
+    xlim = c(0, 32),
+    break.x.by = 6,
+    annot_table = TRUE,
+    surv_times = c(12, 24),
+    surv_label = "PFS",
+    annot_table_x = 0.02,
+    annot_table_y = 0.05,
+    annot_table_width = 0.88,
+    annot_table_height = 0.22,
+    risk.table = "nrisk_cumcensor",
+    risk.table.y.text = TRUE,
+    risk.table.fontsize = 2.8,
+    tables.height = 0.16,
+    risk.table.col = "strata",
+    conf.int = FALSE,
+    surv.scale = "percent",
+    axes.offset = TRUE,
+    palette, 
+    pval = FALSE
+) {
+  
+  surv_times <- sort(unique(surv_times))
+  
+  surv_time_labels <- format(
+    surv_times,
+    trim = TRUE,
+    scientific = FALSE
+  )
+  
+  fit <- survminer::surv_fit(
+    formula = formula,
+    data = data,
+    match.fd = FALSE
+  )
+  
+  has_strata <- !is.null(fit$strata)
+  
+  if (has_strata) {
+    names(fit$strata) <- sub(
+      "^.*?=",
+      "",
+      names(fit$strata)
+    )
+  }
+  
+  # Survival curve 
+  
+  gg <- survminer::ggsurvplot(
+    fit = fit,
+    title = title,
+    legend = if (has_strata) legend else "none",
+    legend.title = legend.title,
+    xlab = xlab,
+    ylab = ylab,
+    xlim = xlim,
+    break.x.by = break.x.by,
+    conf.int = conf.int,
+    risk.table = risk.table,
+    risk.table.y.text = risk.table.y.text,
+    risk.table.fontsize = risk.table.fontsize,
+    risk.table.col = risk.table.col,
+    tables.height = tables.height,
+    censor.shape = 124,
+    censor.size = 1.5,
+    size = 0.8,
+    palette = palette, 
+    ggtheme = ggplot2::theme_classic(base_size = 8) +
+      ggplot2::theme(
+        panel.grid = ggplot2::element_blank(),
+        
+        axis.text = ggplot2::element_text(
+          size = 7.5,
+          colour = "black"
+        ),
+        axis.title.x = ggplot2::element_text(
+          size = 8,
+          face = "bold", 
+          margin = ggplot2::margin(t = 4)
+        ),
+        axis.title.y = ggplot2::element_text(
+          size = 8,
+          face = "bold",
+          margin = ggplot2::margin(r = 4)
+        ),
+        
+        legend.position = "top",
+        legend.title = ggplot2::element_blank(),
+        legend.text = ggplot2::element_text(size = 8),
+        legend.key.width = grid::unit(0.8, "cm"),
+        legend.spacing.x = grid::unit(0.15, "cm"),
+        
+        plot.margin = ggplot2::margin(
+          t = 3,
+          r = 5,
+          b = 3,
+          l = 3
+        )
+      ),
+    
+    tables.theme = survminer::theme_cleantable() +
+      ggplot2::theme(
+        panel.background = ggplot2::element_rect(
+          fill = "white",
+          colour = NA
+        ),
+        plot.background = ggplot2::element_rect(
+          fill = "white",
+          colour = NA
+        ),
+        panel.grid = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(
+          size = 7.5,
+          face = "bold"
+        )
+      ),
+    surv.scale = surv.scale,
+    axes.offset = axes.offset,
+    pval = pval
+  )
+  
+  if (!isTRUE(annot_table)) {
+    return(gg)
+  }
+  
+  
+  # N and N events 
+  fit_table <- summary(fit)$table
+  
+  if (is.null(dim(fit_table))) {
+    
+    n_column <- intersect(
+      c("records", "n.max", "n.start"),
+      names(fit_table)
+    )[1]
+    
+    if (is.na(n_column)) {
+      stop("Impossible d'identifier le nombre de patients.")
+    }
+    
+    base_df <- tibble::tibble(
+      Strata = "Overall",
+      N = as.integer(
+        fit_table[[n_column]]
+      ),
+      Events = as.integer(
+        fit_table[["events"]]
+      )
+    )
+    
+  } else {
+    
+    base_df <- fit_table %>%
+      as.data.frame() %>%
+      tibble::rownames_to_column(
+        var = "Strata"
+      )
+    
+    n_column <- intersect(
+      c("records", "n.max", "n.start"),
+      names(base_df)
+    )[1]
+    
+    if (is.na(n_column)) {
+      stop("Impossible d'identifier le nombre de patients.")
+    }
+    
+    base_df <- base_df %>%
+      dplyr::transmute(
+        Strata = sub(
+          "^.*=",
+          "",
+          Strata
+        ),
+        `No. of\npatients` = as.integer(
+          .data[[n_column]]
+        ),
+        `No. of\nevents` = as.integer(
+          .data[["events"]]
+        )
+      )
+  }
+  
+  # Survival rates 
+  
+  rate_column_names <- paste0(
+    surv_time_labels,
+    "-month ",
+    surv_label,
+    "\n[95% CI]"
+  )
+  
+  rates_long <- dplyr::bind_rows(
+    lapply(
+      seq_along(surv_times),
+      function(i) {
+        
+        requested_time <- surv_times[i]
+        
+        surv_at_time <- summary(
+          fit,
+          times = requested_time,
+          extend = TRUE
+        )
+        
+        if (is.null(surv_at_time$strata)) {
+          
+          strata_at_time <- rep(
+            "Overall",
+            length(surv_at_time$surv)
+          )
+          
+        } else {
+          
+          strata_at_time <- sub(
+            "^.*=",
+            "",
+            as.character(surv_at_time$strata)
+          )
+        }
+        
+        missing_estimate <- (
+          is.na(surv_at_time$surv) |
+            is.na(surv_at_time$lower) |
+            is.na(surv_at_time$upper)
+        )
+        
+        formatted_rate <- ifelse(
+          missing_estimate,
+          "NE",
+          sprintf(
+            "%.1f%% [%.1f–%.1f]",
+            100 * surv_at_time$surv,
+            100 * surv_at_time$lower,
+            100 * surv_at_time$upper
+          )
+        )
+        
+        tibble::tibble(
+          Strata = strata_at_time,
+          rate_column = rate_column_names[i],
+          rate = formatted_rate
+        )
+      }
+    )
+  )
+  
+  rates_df <- rates_long %>%
+    dplyr::mutate(
+      rate_column = factor(
+        rate_column,
+        levels = rate_column_names
+      )
+    ) %>%
+    tidyr::pivot_wider(
+      id_cols = Strata,
+      names_from = rate_column,
+      values_from = rate,
+      names_sort = FALSE
+    )
+  
+  # Final table
+  
+  summary_df <- base_df %>%
+    dplyr::left_join(
+      rates_df,
+      by = "Strata"
+    ) %>%
+    dplyr::select(
+      Strata,
+      `No. of\npatients`,
+      `No. of\nevents`,
+      dplyr::all_of(rate_column_names)
+    )
+  
+  # Colors 
+  plot_build <- ggplot2::ggplot_build(
+    gg$plot
+  )
+  
+  palette <- unique(
+    plot_build$data[[1]]$colour
+  )
+  
+  palette <- palette[
+    !is.na(palette)
+  ]
+  
+  if (length(palette) == 0L) {
+    palette <- "black"
+  }
+  
+  # Table construction 
+  summary_grob <- gridExtra::tableGrob(
+    summary_df,
+    rows = NULL,
+    theme = gridExtra::ttheme_minimal(
+      base_size = 7,
+      core = list(
+        fg_params = list(
+          fontsize = 7
+        ),
+        bg_params = list(
+          fill = "white",
+          col = NA
+        ),
+        padding = grid::unit(
+          c(1, 1.5),
+          "mm"
+        )
+      ),
+      colhead = list(
+        fg_params = list(
+          col = "black",
+          fontface = "bold",
+          fontsize = 7
+        ),
+        bg_params = list(
+          fill = "white",
+          col = NA
+        ),
+        padding = grid::unit(
+          c(1, 1.5),
+          "mm"
+        )
+      )
+    )
+  )
+  
+  # Column widths 
+  summary_grob$widths <- grid::unit(
+    c(
+      1.20,                         # Strata
+      1,                            # N
+      1,                            # Events
+      rep(1.8, length(surv_times))  # Survival rates
+    ),
+    "null"
+  )
+  
+  # Colour all cells 
+  table_layout <- summary_grob$layout
+  
+  body_cells <- which(
+    table_layout$name == "core-fg"
+  )
+  
+  body_rows <- sort(
+    unique(table_layout$t[body_cells])
+  )
+  
+  for (i in seq_along(body_rows)) {
+    
+    row_cells <- body_cells[
+      table_layout$t[body_cells] == body_rows[i]
+    ]
+    
+    row_color <- palette[
+      (i - 1) %% length(palette) + 1
+    ]
+    
+    for (cell in row_cells) {
+      
+      is_strata_column <- (
+        table_layout$l[cell] == 1
+      )
+      
+      summary_grob$grobs[[cell]]$gp <-
+        grid::gpar(
+          col = row_color,
+          fontsize = 7#,
+          # fontface = if (
+          #   is_strata_column
+          # ) {
+          #   "bold"
+          # } else {
+          #   "plain"
+          # }
+        )
+    }
+  }
+  
+  # Table height
+  if (is.null(annot_table_height)) {
+    
+    annot_table_height <- max(
+      0.5,
+      min(
+        0.40,
+        0.2 * (nrow(summary_df) + 1)
+      )
+    )
+  }
+  
+  # Insert table
+  
+  plot_x_limits <- if (is.null(xlim)) {
+    range(fit$time, na.rm = TRUE)
+  } else {
+    xlim
+  }
+  
+  plot_x_range <- diff(plot_x_limits)
+  
+  table_xmin <- plot_x_limits[1] +
+    annot_table_x * plot_x_range
+  
+  table_xmax <- plot_x_limits[1] +
+    min(
+      1,
+      annot_table_x + annot_table_width
+    ) * plot_x_range
+  
+  table_ymin <- annot_table_y
+  
+  table_ymax <- min(
+    0.98,
+    annot_table_y + annot_table_height
+  )
+  
+  # Add the table to the ggsurvplot 
+  
+  gg$plot <- gg$plot +
+    ggplot2::annotation_custom(
+      grob = summary_grob,
+      xmin = table_xmin,
+      xmax = table_xmax,
+      ymin = table_ymin,
+      ymax = table_ymax
+    )
+  
+  if (!is.null(gg$table)) {
+    
+    gg$table <- gg$table +
+      ggplot2::labs(
+        x = "",
+        title = "No. at risk (censored)"
+      )
+    
+    gg$table$theme$axis.title.y <- ggplot2::element_blank()
+    gg$table$theme$axis.text.x <- ggplot2::element_blank()
+    gg$table$theme$axis.ticks.x <- ggplot2::element_blank()
+    gg$table$theme$axis.title.x <- ggplot2::element_blank()
+    gg$table$theme$legend.position <- "none"
+    
+    risk_table_height <- max(
+      tables.height,
+      min(
+        0.35,
+        0.10 + 0.04 * nrow(summary_df)
+      )
+    )
+  
+    aligned_plots <- cowplot::align_plots(
+      gg$plot,
+      gg$table,
+      align = "v",
+      axis = "lr"
+    )
+    
+    final_plot <- cowplot::plot_grid(
+      plotlist = aligned_plots,
+      ncol = 1,
+      rel_heights = c(
+        1 - risk_table_height,
+        risk_table_height
+      )
+    )
+    
+  } else {
+    
+    final_plot <- gg$plot
+  }
+  
+  final_grob <- ggplot2::ggplotGrob(
+    final_plot
+  )
+
+  list(
+    plot = final_plot,
+    grob = final_grob,
+    ggs = gg,
+    table = summary_df,
+    table_grob = summary_grob,
+    fit = fit
+  )
+}
+
 #' Create stratified Cox proportional hazards regression tables
 #'
 #' This function fits Cox proportional hazards regression models within levels
