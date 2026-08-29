@@ -585,6 +585,7 @@ plot_continuous <- function(df,
 #' @export
 plot_dichotomous <- function(df,
                              var_prefix = "genomic_pathway_",
+                             var_suffix, 
                              with_group = TRUE,
                              group_var = "cohort",
                              xlab = NULL,
@@ -595,7 +596,9 @@ plot_dichotomous <- function(df,
                              legend.direction = "horizontal",
                              process_panel = FALSE) {
   
-  vars <- names(dplyr::select(df, dplyr::starts_with(var_prefix)))
+  vars <- names(dplyr::select(df, 
+                              dplyr::starts_with(var_prefix) &
+                                dplyr::ends_with(var_suffix)))
   
   df_raw <- df %>%
     dplyr::select(
