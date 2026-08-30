@@ -683,7 +683,7 @@ tbl_cox <- function(data,
         gtsummary::tbl_uvregression(
           method = survival::coxph,
           y = survival::Surv(rlang::eval_tidy(time), rlang::eval_tidy(event)),
-          include = covars,
+          include = all_of(covars),
           exponentiate = exponentiate,
           hide_n = TRUE,
           tidy_fun = tidy_fun

@@ -9,11 +9,11 @@ source(here::here("R","cox_boosting.R"))
 # Load data 
 tcga <- read_processed(cohort = "tcga")%>%
   purrr::list_flatten()%>%
+  # Only pathway-level analyses 
   { .[setdiff(names(.), c("clin",
                           "gene_clin_dna",
                           "gene_clin_rna",
-                          "gene_clin_dna_rna"
-                          ))]}
+                          "gene_clin_dna_rna"))]}
 
 clin <- c("age","figo","hpv_negative")
 dna_pattern <- "genomic_pathway_"
@@ -23,7 +23,9 @@ X_names <- tcga %>%
   purrr::map(~.x %>% 
                dplyr::select(all_of(clin), 
                              tidyselect::matches(dna_pattern),
-                             tidyselect::matches(rna_pattern)) %>% 
+                             tidyselect::matches(rna_pattern),
+                             -dplyr::ends_with(c("two_genes","count","prop",
+                                                 "alteration_burden"))) %>% 
                names())
 
 # Model-based boosting ----------------------------------------------------
@@ -47,8 +49,8 @@ cox_lboost_fit <- tcga %>%
       event     = .x$event,
       X         = .x %>% dplyr::select(all_of(X_names[[.y]])),
       mandatory = c("age", "figo", "hpv_negative"),
-      stepno    = 30,    
-      seed      = 123
+      seed      = 123,
+      stepno    = 30
     )
   )
 
@@ -57,5 +59,3 @@ cox_lboost_fit <- tcga %>%
 for (i in ls(pattern = "_fit")){
   saveRDS(get(i), here::here("outputs","results", paste0("tcga_",i,".rds")))
 }
-
-rm(list = ls(pattern = "fit"))

@@ -41,8 +41,7 @@ combined_vimp_survML_base_fit <- combined_input_survML_base_fit %>%
     X              = .x$X,
     base_features  = .x$base_features, 
     feature_groups = .x$feature_groups, 
-    SL.library     = SL.library,
-    seed           = 123 
+    SL.library     = SL.library
     )
   )
 end <- Sys.time()

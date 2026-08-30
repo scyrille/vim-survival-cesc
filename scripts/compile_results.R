@@ -31,7 +31,9 @@ rna_process_labels <- pathways_process %>%
 
 combined <- read_processed("combined")$pathway$clin_dna_rna %>%
   set_variable_labels(.labels = labels)
-
+raids <- read_processed("raids")
+tcga <- read_processed("tcga")
+ 
 # Cox lasso ---------------------------------------------------------------
 
 cox_lasso_fit <- cohorts %>%
@@ -102,69 +104,170 @@ tbl_cox_priority_lasso_unpen <- cox_priority_lasso_unpen_fit %>%
 
 # Likelihood-based boosting -----------------------------------------------
 
-## Bio-RAIDs only (with necrosis, HRD, TMB, MSI, mutationals signatures)
-cox_lboost_necrosis_fit <- readRDS(
+## Gene-level ----
+
+# Bio-RAIDs only (with necrosis, HRD, TMB, MSI, mutationals signatures)
+cox_lboost_gene_fit <- readRDS(
   here::here("outputs/results/raids_cox_lboost_necrosis_fit.rds")
 )
 
 # Plot selected coefficients
-cox_lboost_necrosis_fit %>%
+cox_lboost_gene_fit %>%
   plot_coef()%>%
   save_plot(here::here("outputs","figures"), 
-            paste0("raids_cox_lboost_necrosis_clin_dna_rna_coef"), 9, 6)
+            paste0("raids_gene_clin_dna_rna_cox_lboost_coef"), 9, 6)
 
-cox_lboost_necrosis_fit %>%
+cox_lboost_gene_fit %>%
   plot_coef(data_type = T)%>%
   save_plot(here::here("outputs","figures"),
-            paste0("raids_cox_lboost_necrosis_clin_dna_rna_coef_omics"), 9, 6)
+            paste0("raids_gene_clin_dna_rna_cox_lboost_coef_omics"), 9, 6)
 
 # Plot coefficients paths
-cox_lboost_necrosis_fit %>%
+cox_lboost_gene_fit %>%
   plot_coef_paths()%>%
   save_plot(here::here("outputs","figures"), 
-            "raids_cox_lboost_necrosis_clin_dna_rna_coef_paths", 10, 6)
+            "raids_gene_clin_dna_rna_cox_lboost_coef_paths", 6, 4)
 
 # Plot coefficients updates at each boosting step until optimal step
-cox_lboost_necrosis_fit %>%
+cox_lboost_gene_fit %>%
   (\(fit_obj) 0:fit_obj$opt_step %>%
      purrr::walk(
        ~ plot_coef_updates(fit_obj, step_show = .x) %>%
          save_plot(
            here::here("outputs","figures"),
-           paste0("raids_cox_lboost_necrosis_clin_dna_rna_coef_updates_", .x),
+           paste0("raids_gene_clin_dna_rna_cox_lboost_coef_updates_", .x),
            9, 6)
      )
   )()
 
-# Table of selected coefficients
-tbl_cox_lboost_necrosis <- cox_lboost_necrosis_fit %>%
+# Table with number selected variables
+tbl_cox_lboost_gene_nselect <- cox_lboost_gene_fit %>%
   tbl_n_select_coef()
 
-## Across both cohorts 
-cox_lboost_fit <- cohorts %>%
-  purrr::map(~readRDS(here::here("outputs","results",
-                                 paste0(.x,"_cox_lboost_fit.rds"))))%>%
-  set_names(cohorts)#%>%
-# purrr::list_flatten()
+## Table of selected coefficients
+tbl_cox_lboost_gene_coef <- cox_lboost_gene_fit %>%
+  tbl_select_coef()
 
-## Plot selected coefficients 
-cox_lboost_fit %>%
-  purrr::list_flatten()%>%
+## Cox regression with selected variables
+clin <- c("age_c_f", "figo_c_f", "hpv_negative_f","necrosis_f")
+var_select <- cox_lboost_gene_fit$var_select %>%
+  subset(!. %in% c("age","figo","hpv_negative","necrosis"))
+raids_gene_cox_lboost <- raids$gene$clin_dna_rna %>%
+  dplyr::select(time, event, all_of(clin),  all_of(var_select))%>%
+  dplyr::mutate(across(starts_with("rna_seq"), 
+                       ~as.numeric(scale(.x))))%>%
+  labelled::set_variable_labels(
+    .labels =  var_label(raids$gene$clin_dna_rna[,var_select])%>%
+      purrr::map(~gsub("RNA-Seq - ", "", .x))
+  )
+
+tbl_cox_univ_multi_gene_cox_lboost_select <- list(
+  tbl_cox(
+    data   = raids_gene_cox_lboost, 
+    time   = "time",
+    event  = "event",
+    covars = c(clin, var_select),
+    model  = "univ"
+  )%>%
+    gtsummary::add_q(method = "BH") %>%
+    gtsummary::bold_p(q = TRUE),
+  tbl_cox(
+    data   = raids_gene_cox_lboost, 
+    time   = "time",
+    event  = "event",
+    covars = c(clin, var_select),
+    model  = "multi"
+  )%>%
+    gtsummary::add_q(method = "BH") %>%
+    gtsummary::bold_p(q = TRUE) %>%
+    gtsummary::modify_column_hide(c(stat_n, stat_nevent))
+)%>%
+  gtsummary::tbl_merge(tab_spanner = c("**Univariate Cox regression**",
+                                       "**Multivariate Cox regression**"))%>%
+  gtsummary::modify_spanning_header(c(stat_n_1, stat_nevent_1)~NA)
+
+## Pathway-level ---- 
+cox_lboost_pathway_fit <- cohorts %>%
+  purrr::map(~readRDS(here::here(
+    "outputs","results",
+    paste0(.x,"_cox_lboost_fit.rds"))))%>%
+  set_names(cohorts)%>%
+  purrr::list_flatten()
+
+## Plot selected coefficients
+height <- set_names(c(4,9,4,4,5,5), 
+                    names(cox_lboost_pathway_fit))
+cox_lboost_pathway_fit %>%
   purrr::map(~plot_coef(.x))%>%
   purrr::iwalk(~save_plot(.x, here::here("outputs","figures"), 
-                          paste0(.y, "_cox_lboost_coef"), 9, 6))
+                          paste0(.y, "_cox_lboost_coef"), 9, height[.y]))
 
-cox_lboost_fit %>%
-  purrr::list_flatten()%>%
+cox_lboost_pathway_fit %>%
   purrr::map(~plot_coef(.x, data_type = T))%>%
   purrr::iwalk(~save_plot(.x, here::here("outputs","figures"), 
-                          paste0(.y, "_cox_lboost_coef_omics"), 9, 6))
+                          paste0(.y, "_cox_lboost_coef_omics"), 9, height[.y]))
 
-## Table of selected coefficients
-tbl_cox_lboost <- cox_lboost_fit %>%
-  purrr::map(
-    ~purrr::map(.x, tbl_n_select_coef)%>%
-      .custom_list_tbl_n_select_coef())
+# Plot coefficients paths
+cox_lboost_pathway_fit %>%
+  purrr::map(~plot_coef_paths(.x))%>%
+  purrr::iwalk(~save_plot(.x, here::here("outputs","figures"), 
+                          paste0(.y, "_cox_lboost_coef_paths"), 6, 4))
+
+## Table of number of selected variables
+tbl_cox_lboost_pathway_nselect <- cox_lboost_pathway_fit %>%
+  purrr::map(~tbl_n_select_coef(.x))
+
+## Table of of selected coefficients 
+tbl_cox_lboost_pathway_coef <- cox_lboost_pathway_fit %>%
+  purrr::map(~tbl_select_coef(.x))
+
+## Cox regression with selected variables
+clin <- c("age_c_f", "figo_c_f", "hpv_negative_f")
+var_select <- cox_lboost_pathway_fit[c("raids_pathway_clin_dna_rna",
+                                       "tcga_pathway_clin_dna_rna")]%>%
+  purrr::map(~.x$var_select %>%
+               subset(!. %in% c("age","figo","hpv_negative")))
+tbl_cox_univ_multi_pathway_cox_lboost_select <- list(
+  raids$pathway$clin_dna_rna, 
+  tcga$pathway$clin_dna_rna
+  ) %>%
+  set_names(c("raids_pathway_clin_dna_rna",
+              "tcga_pathway_clin_dna_rna"))%>%
+  purrr::imap(
+    ~.x %>%
+      dplyr::select(time, event, all_of(clin), all_of(var_select[[.y]]))%>%
+      dplyr::mutate(across(starts_with("hallmark"), 
+                           ~as.numeric(scale(.x))))%>%
+      labelled::set_variable_labels(
+        .labels =  var_label(.x[,var_select[[.y]]])
+      )
+  )%>% 
+  purrr::imap(
+    ~list(
+      tbl_cox(
+        data   = .x, 
+        time   = "time",
+        event  = "event",
+        covars = c(clin, var_select[[.y]]),
+        model  = "univ"
+      )%>%
+        gtsummary::add_q(method = "BH") %>%
+        gtsummary::bold_p(q = TRUE),
+      tbl_cox(
+        data   = .x, 
+        time   = "time",
+        event  = "event",
+        covars = c(clin, var_select[[.y]]),
+        model  = "multi"
+      )%>% 
+        gtsummary::add_q(method = "BH") %>%
+        gtsummary::bold_p(q = TRUE) %>%
+        gtsummary::modify_column_hide(c(stat_n, stat_nevent))
+    )%>%
+    gtsummary::tbl_merge(tab_spanner = c("**Univariate Cox regression**",
+                                         "**Multivariate Cox regression**"))%>%
+    gtsummary::modify_spanning_header(c(stat_n_1, stat_nevent_1)~NA)
+)
 
 # Model-based boosting ----------------------------------------------------
 
@@ -194,22 +297,57 @@ tbl_cox_lboost <- cox_lboost_fit %>%
 #       .custom_list_tbl_n_select_coef())
 
 
-# survML: VIM relative to base model ----------------------------------------------
+# survML: VIM relative to full model (Bio-RAIDs only) ---------------------
+
+# Load results 
+vimp_survML_full_est <- readRDS(
+  here::here("outputs","results","raids_vimp_survML_full_est.RDS")
+  )%>%
+  purrr::map(~.x %>% dplyr::mutate(data_type = tolower(data_type)))
+
+# Plots of VIMs
+vimp_survML_full_est_split <- vimp_survML_full_est %>%
+  purrr::map(~.x %>% group_split_custom(landmark_time))%>%
+  purrr::list_flatten()
+
+width <- set_names(rep(9, 9), 
+                   names(vimp_survML_full_est_split))
+height <- set_names(c(rep(18, 3), rep(20, 3), rep(25, 3)), 
+                    names(vimp_survML_full_est_split))
+
+vimp_survML_full_est_split %>%
+  purrr::imap(~ plot_vimp_est(
+    .x,
+    ylab   = "",
+    type   = "dotplot",
+    process_panel = F
+  )) %>%
+  purrr::iwalk(~ save_plot(.x, here::here("outputs","figures"),
+                           paste0("raids_dotplot_surv_vimp_full_est_", .y),
+                           width[.y], height[.y]))
+
+# Summary table of top-10 ranked pathways
+tbl_compare_vimp_survML_full_top10 <- vimp_survML_full_est %>%
+  purrr::map(
+    ~tbl_top10_vimp(
+      vims    = .x,
+      compare = FALSE,
+      n_top   = 10
+    )
+)
+
+# survML: VIM relative to base model --------------------------------------
 
 ## Parallel analysis across cohorts ----
 
 ### Main analysis ----
 
 # Load all results 
-vimp_survML_base_fit <- cohorts %>%
+vimp_survML_base_est <- cohorts %>%
   purrr::map(~readRDS(here::here("outputs","results",
-                                 paste0(.x,"_vimp_survML_base_fit.rds"))))%>%
-  set_names(cohorts_name)
-
-# Get all VIMs  
-vimp_survML_base_est <- vimp_survML_base_fit %>%
-  purrr::imap(~get_vimp_est(.x)%>%
-                mutate(cohort = .y))%>%
+                                 paste0(.x,"_vimp_survML_base_est.rds"))))%>%
+  set_names(cohorts_name)%>%
+  purrr::imap(~.x %>% mutate(cohort = .y))%>%
   bind_rows()%>%
   dplyr::mutate(data_type = tolower(data_type))
 
@@ -327,15 +465,12 @@ scatter_plot_vimp(vims = vimp_survML_base_est)%>%
 ####  Adjustment on alteration burden ----
 
 # Load all results 
-vimp_survML_base_sens1_adj_fit <- cohorts %>%
-  purrr::map(~readRDS(here::here("outputs","results",
-                                 paste0(.x,"_vimp_survML_base_sens1_adj_fit.rds"))))%>%
-  set_names(cohorts_name)
-
-# Get all VIMs  
-vimp_survML_base_sens1_adj_est <- vimp_survML_base_sens1_adj_fit %>%
-  purrr::imap(~get_vimp_est(.x)%>%
-                mutate(cohort = .y))%>%
+vimp_survML_base_sens1_adj_est <- cohorts %>%
+  purrr::map(~readRDS(here::here(
+    "outputs","results",
+    paste0(.x,"_vimp_survML_base_sens1_adj_est.rds"))))%>%
+  set_names(cohorts_name)%>%
+  purrr::imap(~.x %>% mutate(cohort = .y))%>%
   bind_rows()%>%
   dplyr::mutate(data_type = tolower(data_type))
 
@@ -349,22 +484,20 @@ tbl_compare_vimp_survML_base_sens1_adj_top10 <- tbl_top10_vimp(
 # Cross-cohort comparison 
 tbl_vimp_survML_base_sens1_adj_top10_overlap <- tbl_top_overlap_vimp(
   vims = vimp_survML_base_sens1_adj_est, 
-  k = 10))
+  k = 10
+)
 
 #### Alternative DNA pathway definitions ----
 
 ##### At least two altered genes ----
 
 # Load all results 
-vimp_survML_base_sens2_two_genes_fit <- cohorts %>%
-  purrr::map(~readRDS(here::here("outputs","results",
-                                 paste0(.x,"_vimp_survML_base_sens2_two_genes_fit.rds"))))%>%
-  set_names(cohorts_name)
-
-# Get all VIMs  
-vimp_survML_base_sens2_two_genes_est <- vimp_survML_base_sens2_two_genes_fit %>%
-  purrr::imap(~get_vimp_est(.x)%>%
-                mutate(cohort = .y))%>%
+vimp_survML_base_sens2_two_genes_est <- cohorts %>%
+  purrr::map(~readRDS(here::here(
+    "outputs","results",
+    paste0(.x,"_vimp_survML_base_sens2_two_genes_est.rds"))))%>%
+  set_names(cohorts_name)%>%
+  purrr::imap(~.x %>% mutate(cohort = .y))%>%
   bind_rows()%>%
   dplyr::mutate(data_type = tolower(data_type))
 
@@ -378,20 +511,18 @@ tbl_compare_vimp_survML_base_sens2_two_genes_top10 <- tbl_top10_vimp(
 # Cross-cohort comparison 
 tbl_vimp_survML_base_sens2_two_genes_top10_overlap <- tbl_top_overlap_vimp(
   vims = vimp_survML_base_sens2_two_genes_est, 
-  k = 10))
+  k = 10
+)
 
 ##### Proportion of constituent altered genes ----
 
 # Load all results
-vimp_survML_base_sens3_prop_fit <- cohorts %>%
-  purrr::map(~readRDS(here::here("outputs","results",
-                                 paste0(.x,"_vimp_survML_base_sens3_prop_fit.rds"))))%>%
-  set_names(cohorts_name)
-
-# Get all VIMs  
-vimp_survML_base_sens3_prop_est <- vimp_survML_base_sens3_prop_fit %>%
-  purrr::imap(~get_vimp_est(.x)%>%
-                mutate(cohort = .y))%>%
+vimp_survML_base_sens3_prop_est <- cohorts %>%
+  purrr::map(~readRDS(here::here(
+    "outputs","results",
+    paste0(.x,"_vimp_survML_base_sens3_prop_est.rds"))))%>%
+  set_names(cohorts_name) %>%
+  purrr::imap(~.x %>% mutate(cohort = .y))%>%
   bind_rows()%>%
   dplyr::mutate(data_type = tolower(data_type))
 
@@ -405,24 +536,20 @@ tbl_compare_vimp_survML_base_sens3_prop_top10 <- tbl_top10_vimp(
 # Cross-cohort comparison 
 tbl_vimp_survML_base_sens3_prop_top10_overlap <- tbl_top_overlap_vimp(
   vims = vimp_survML_base_sens3_prop_est, 
-  k = 10))
+  k = 10
+)
 
 ## Pooled analysis ----
 
 # Load all results
-combined_vimp_survML_base_fit <- readRDS(
-  here::here("outputs/results/combined_vimp_survML_base_fit.rds"))
-
-# VIMs  
-combined_vimp_survML_base_est <- combined_vimp_survML_base_fit %>%
-  purrr::imap(~get_vimp_est(.x)%>%
-                dplyr::mutate(data_type = tolower(data_type)))%>%
+combined_vimp_survML_base_est <- readRDS(
+  here::here("outputs/results/combined_vimp_survML_base_est.rds"))%>%
+  purrr::imap(~.x %>% dplyr::mutate(data_type = tolower(data_type)))%>%
   purrr::set_names(janitor::make_clean_names(names(.)))
   
 # Plots of VIMs
 combined_vimp_survML_base_est_split <- combined_vimp_survML_base_est %>%
-  purrr::map(~.x %>%
-               group_split_custom(data_type, landmark_time))%>%
+  purrr::map(~.x %>% group_split_custom(data_type, landmark_time))%>%
   purrr::list_flatten()
 
 width <- set_names(rep(c(23,9,23,9),2), 

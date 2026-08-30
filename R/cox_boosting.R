@@ -230,7 +230,7 @@ plot_coef <- function(fit_obj, data_type = F){
       scale_fill_manual("", 
                         breaks = c("Clinical","Genomic","Transcriptomic"),
                         values = c("#0AB329","#FF5733","#0771A2"))+
-      labs(x = "Variable", y = "Coefficient")+
+      labs(x = "Variable", y = expression(beta))+
       coord_flip()+
       theme_classic()+
       theme(legend.position = "none",
@@ -246,7 +246,7 @@ plot_coef <- function(fit_obj, data_type = F){
     plot <- ggplot(coef, aes(x=label, y=coef, label=coef)) +
       geom_bar(stat='identity', aes(fill=sign), width=.5) +
       scale_fill_manual(values = c("p"="#f8766d", "n"="#00ba38")) +
-      labs(x = "Variable", y = "Coefficient")+
+      labs(x = "Variable", y = expression(beta))+
       coord_flip()+
       theme_classic()+
       theme(legend.position = "none",
@@ -309,7 +309,7 @@ plot_coef_updates <- function(fit_obj,
                        breaks = seq(-1.5, 1.5, .5))+
     coord_flip() +
     labs(#title = paste("Boosting step n°", step_show),
-      x = "Variable", y = "Coefficient") +
+      x = "Variable", y = expression(beta)) +
     theme_classic() +
     theme(axis.text.y = element_text(color = color),
           legend.position = "none",
@@ -401,3 +401,18 @@ tbl_n_select_coef <- function(fit_obj){
   tibble(n_clin, n_DNA, n_RNA, n_tot)
 }
 
+#' Summary table with selected features
+
+#'@param fit_obj
+
+tbl_select_coef <- function(fit_obj){
+  
+  fit_obj$coef_select %>%
+    dplyr::select(label, coef)%>%
+    dplyr::mutate(coef = format(round(coef, 3), nsmall = 3))%>%
+    gt::gt()%>%
+    gt::cols_label(
+      label = md("**Variable**"), 
+      coef = md("**Coefficient**")
+    )
+}

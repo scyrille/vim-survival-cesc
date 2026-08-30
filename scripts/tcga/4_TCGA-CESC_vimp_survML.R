@@ -10,42 +10,6 @@ source(here::here("R","vimp.R"))
 # Load data 
 tcga <- read_processed(cohort = "tcga")
 
-# VIM relative to all features --------------------------------------------
-
-#' Estimating variable importance relative to all features 
-
-#' We consider the importance of each variable relative to a full 
-#' feature vector composed of all clinical features and pathways.
-#' We will use the exclusion variable importance method to quantify 
-#' importance of variables. This procedure involves iteratively 
-#' removing each feature from the data set, retraining the model without 
-#' that feature and evaluating its impact on model performance. 
-
-input_survML_full_fit <- tcga$pathway %>%
-  purrr::map(
-    ~.x %>% 
-      make_input_vimp_survML_full(
-        var_clin = c("age","hpv_negative","figo"),
-        dna_prefix = "genomic_pathway_",
-        dna_suffix = "any_gene", 
-        rna_prefix = "hallmark_"
-    )
-  )
-
-start <- Sys.time()
-vimp_survML_full_fit <- input_survML_full_fit %>%
-  purrr::map(
-    ~ compute_vimp_survML_full(
-      time           = .x$time,
-      event          = .x$event,
-      X              = .x$X,
-      feature_groups = .x$feature_groups,
-      seed           = 123
-    )
-  )
-end <- Sys.time()
-vimp_survML_full_fit_runtime <- as.numeric(difftime(end, start, units = "mins"))
-
 # VIM relative to clinical features ---------------------------------------
 
 ## Main analysis ----
@@ -63,6 +27,7 @@ input_survML_base_fit <- tcga$pathway$clin_dna_rna %>%
   make_input_vimp_survML_base(
     var_clin = c("age","hpv_negative","figo"),
     dna_prefix = "genomic_pathway_",
+    dna_suffix = "any_gene", 
     rna_prefix = "hallmark_"
   )
 
@@ -73,16 +38,22 @@ vimp_survML_base_fit <- compute_vimp_survML_base(
   X              = input_survML_base_fit$X,
   base_features  = input_survML_base_fit$base_features, 
   feature_groups = input_survML_base_fit$feature_groups, 
-  SL.library     = SL.library,
-  seed           = 123
-  )
+  SL.library     = SL.library
+)
 end <- Sys.time()
 vimp_survML_base_fit_runtime <- 
   as.numeric(difftime(end, start, units = "mins"))
 
+vimp_survML_base_est <- get_vimp_est(
+  fit = vimp_survML_base_fit, 
+  landmark_time = 24, 
+  method = "survML"
+)
+
 ## Sensitivity analyses ----
 
-SL.library <- make_SL_library()
+SL.library <- make_SL_library() %>% 
+  subset(.!="ridge_1") # remove ridge
 
 ### Adjustment on genomic alteration burden ----
 input_survML_base_sens1_adj_fit <- tcga$pathway$clin_dna_rna %>%
@@ -108,12 +79,17 @@ vimp_survML_base_sens1_adj_fit <- compute_vimp_survML_base(
   X              = input_survML_base_sens1_adj_fit$X,
   base_features  = input_survML_base_sens1_adj_fit$base_features, 
   feature_groups = input_survML_base_sens1_adj_fit$feature_groups, 
-  SL.library     = SL.library,
-  seed           = 123 
+  SL.library     = SL.library
 )
 end <- Sys.time()
 vimp_survML_base_sens1_adj_fit_runtime <- 
   as.numeric(difftime(end, start, units = "mins"))
+
+vimp_survML_base_sens1_adj_est <- get_vimp_est(
+  fit = vimp_survML_base_sens1_adj_fit, 
+  landmark_time = 24, 
+  method = "survML"
+)
 
 ### Alternative DNA pathway definitions ----
 
@@ -140,12 +116,17 @@ vimp_survML_base_sens2_two_genes_fit <- compute_vimp_survML_base(
   X              = input_survML_base_sens2_two_genes_fit$X,
   base_features  = input_survML_base_sens2_two_genes_fit$base_features, 
   feature_groups = input_survML_base_sens2_two_genes_fit$feature_groups, 
-  SL.library     = SL.library,
-  seed           = 123 
+  SL.library     = SL.library
 )
 end <- Sys.time()
 vimp_survML_base_sens2_two_genes_fit_runtime <- 
   as.numeric(difftime(end, start, units = "mins"))
+
+vimp_survML_base_sens2_two_genes_est <- get_vimp_est(
+  fit = vimp_survML_base_sens2_two_genes_fit, 
+  landmark_time = 24, 
+  method = "survML"
+)
 
 # Proportion of constituent altered genes 
 input_survML_base_sens3_prop_fit <- tcga$pathway$clin_dna_rna %>%
@@ -170,17 +151,20 @@ vimp_survML_base_sens3_prop_fit <- compute_vimp_survML_base(
   X              = input_survML_base_sens3_prop_fit$X,
   base_features  = input_survML_base_sens3_prop_fit$base_features, 
   feature_groups = input_survML_base_sens3_prop_fit$feature_groups, 
-  SL.library     = SL.library,
-  seed           = 123 
+  SL.library     = SL.library
 )
 end <- Sys.time()
 vimp_survML_base_sens3_prop_fit_runtime <- 
   as.numeric(difftime(end, start, units = "mins"))
 
+vimp_survML_base_sens3_prop_est <- get_vimp_est(
+  fit = vimp_survML_base_sens3_prop_fit, 
+  landmark_time = 24, 
+  method = "survML"
+)
+
 # ---------------------------- Save all results -------------------------#
 
-for (i in setdiff(ls(pattern = "_fit|_runtime"), ls(pattern = "input"))){
+for (i in setdiff(ls(pattern = "_est|_fit|_runtime"), ls(pattern = "input"))){
   saveRDS(get(i), here::here("outputs","results", paste0("tcga_",i,".rds")))
 }
-
-rm(list = ls(pattern = "_fit"))

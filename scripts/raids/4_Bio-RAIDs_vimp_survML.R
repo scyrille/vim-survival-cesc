@@ -39,12 +39,21 @@ vimp_survML_full_fit <- input_survML_full_fit %>%
         time           = .x$time,
         event          = .x$event,
         X              = .x$X,
-        feature_groups = .x$feature_groups,
-        seed           = 123
+        feature_groups = .x$feature_groups
         )
-    )
+    )%>%
+  set_names(names(raids$pathway))
 end <- Sys.time()
 vimp_survML_full_fit_runtime <- as.numeric(difftime(end, start, units = "mins"))
+
+vimp_survML_full_est <- vimp_survML_full_fit %>%
+  purrr::map(
+    ~get_vimp_est(
+      fit           = .x, 
+      landmark_time = c(12,24,36), 
+      method        = "survML"
+  )
+)
 
 # VIM relative to clinical features ---------------------------------------
 
@@ -74,16 +83,22 @@ vimp_survML_base_fit <- compute_vimp_survML_base(
     X              = input_survML_base_fit$X,
     base_features  = input_survML_base_fit$base_features, 
     feature_groups = input_survML_base_fit$feature_groups, 
-    SL.library     = SL.library,
-    seed           = 123 
+    SL.library     = SL.library
     )
 end <- Sys.time()
 vimp_survML_base_fit_runtime <- 
   as.numeric(difftime(end, start, units = "mins"))
 
+vimp_survML_base_est <- get_vimp_est(
+    fit = vimp_survML_base_fit, 
+    landmark_time = 24, 
+    method = "survML"
+)
+
 ## Sensitivity analyses ----
 
-SL.library <- make_SL_library()
+SL.library <- make_SL_library() %>% 
+  subset(.!="ridge_1") # remove ridge
 
 ### Adjustment on genomic alteration burden ----
 input_survML_base_sens1_adj_fit <- raids$pathway$clin_dna_rna %>%
@@ -109,12 +124,17 @@ vimp_survML_base_sens1_adj_fit <- compute_vimp_survML_base(
   X              = input_survML_base_sens1_adj_fit$X,
   base_features  = input_survML_base_sens1_adj_fit$base_features, 
   feature_groups = input_survML_base_sens1_adj_fit$feature_groups, 
-  SL.library     = SL.library,
-  seed           = 123 
+  SL.library     = SL.library
 )
 end <- Sys.time()
 vimp_survML_base_sens1_adj_fit_runtime <- 
   as.numeric(difftime(end, start, units = "mins"))
+
+vimp_survML_base_sens1_adj_est <- get_vimp_est(
+  fit = vimp_survML_base_sens1_adj_fit, 
+  landmark_time = 24, 
+  method = "survML"
+)
 
 ### Alternative DNA pathway definitions ----
 
@@ -141,12 +161,17 @@ vimp_survML_base_sens2_two_genes_fit <- compute_vimp_survML_base(
   X              = input_survML_base_sens2_two_genes_fit$X,
   base_features  = input_survML_base_sens2_two_genes_fit$base_features, 
   feature_groups = input_survML_base_sens2_two_genes_fit$feature_groups, 
-  SL.library     = SL.library,
-  seed           = 123 
+  SL.library     = SL.library
 )
 end <- Sys.time()
 vimp_survML_base_sens2_two_genes_fit_runtime <- 
   as.numeric(difftime(end, start, units = "mins"))
+
+vimp_survML_base_sens2_two_genes_est <- get_vimp_est(
+  fit = vimp_survML_base_sens2_two_genes_fit, 
+  landmark_time = 24, 
+  method = "survML"
+)
 
 # Proportion of constituent altered genes 
 input_survML_base_sens3_prop_fit <- raids$pathway$clin_dna_rna %>%
@@ -171,17 +196,20 @@ vimp_survML_base_sens3_prop_fit <- compute_vimp_survML_base(
   X              = input_survML_base_sens3_prop_fit$X,
   base_features  = input_survML_base_sens3_prop_fit$base_features, 
   feature_groups = input_survML_base_sens3_prop_fit$feature_groups, 
-  SL.library     = SL.library,
-  seed           = 123 
+  SL.library     = SL.library
 )
 end <- Sys.time()
 vimp_survML_base_sens3_prop_fit_runtime <- 
   as.numeric(difftime(end, start, units = "mins"))
 
+vimp_survML_base_sens3_prop_est <- get_vimp_est(
+  fit = vimp_survML_base_sens3_prop_fit, 
+  landmark_time = 24, 
+  method = "survML"
+)
+
 # ---------------------------- Save all results -------------------------#
 
-for (i in setdiff(ls(pattern = "_fit|_runtime"), ls(pattern = "input"))){
+for (i in setdiff(ls(pattern = "_est|_fit|_runtime"), ls(pattern = "input"))){
   saveRDS(get(i), here::here("outputs","results", paste0("raids_",i,".rds")))
 }
-
-rm(list = ls(pattern = "_fit"))

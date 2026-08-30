@@ -344,7 +344,7 @@ make_input_vimp_survML_full <- function(data,
     )
   
   clin_features <- paste0(which(names(X) %in% var_clin))%>%
-    set_names(var_label(X[,as.integer(.)], unlist = T))
+    set_names(paste0(var_label(X[,as.integer(.)], unlist = T), " (Clinical)"))
   
   dna_pathways <- paste0(which(startsWith(names(X), dna_prefix) & 
                                  endsWith(names(X), dna_suffix)))%>%
@@ -436,14 +436,16 @@ get_vimp_est <- function(fit,
       {rownames(.) <- NULL; .}%>%
       dplyr::mutate(
         data_type = case_when(
+          grepl("\\(Clinical\\)", variable~"Clinical"), 
           grepl("\\(DNA pathway\\)", variable)~"DNA_pathways",
           grepl("\\(RNA pathway\\)", variable)~"RNA_pathways",
           grepl("\\(DNA process\\)", variable)~"DNA_processes",
           grepl("\\(RNA process\\)", variable)~"RNA_processes"), 
-        label = gsub(paste(c("\\(DNA pathway\\)",
-                             "\\(RNA pathway\\)",
-                             "\\(DNA process\\)",
-                             "\\(RNA process\\)"),
+        variable = gsub(paste(c(" \\(Clinical\\)",
+                             " \\(DNA pathway\\)",
+                             " \\(RNA pathway\\)",
+                             " \\(DNA process\\)",
+                             " \\(RNA process\\)"),
                            collapse = "|"),"", variable))%>%
       dplyr::filter(landmark_time %in% !!landmark_time)%>%
       dplyr::group_by(data_type) %>%
@@ -457,7 +459,7 @@ get_vimp_est <- function(fit,
       dplyr::mutate(data_type = "DNA_pathways")%>%
       dplyr::filter(`_times_`%in% !!landmark_time & `_permutation_` == 0)%>%
       pivot_longer(-c(`_times_`,`_permutation_`, data_type), 
-                   names_to = "label", 
+                   names_to = "variable", 
                    values_to = "est")
     
     dna_process <- fit[["model_parts_pathways_groups"]]$result %>%
@@ -465,7 +467,7 @@ get_vimp_est <- function(fit,
       dplyr::mutate(data_type = "DNA_processes")%>%
       dplyr::filter(`_times_`%in% !!landmark_time & `_permutation_` == 0)%>%
       pivot_longer(-c(`_times_`,`_permutation_`, data_type), 
-                   names_to = "label", 
+                   names_to = "variable", 
                    values_to = "est")
     
     rna_pathway <- fit[["model_parts_pathways"]]$result %>%
@@ -473,7 +475,7 @@ get_vimp_est <- function(fit,
       dplyr::mutate(data_type = "RNA_pathways")%>%
       dplyr::filter(`_times_`%in% !!landmark_time & `_permutation_` == 0)%>%
       pivot_longer(-c(`_times_`,`_permutation_`, data_type), 
-                   names_to = "label", 
+                   names_to = "variable", 
                    values_to = "est")
     
     rna_process <- fit[["model_parts_pathways_groups"]]$result %>%
@@ -481,15 +483,16 @@ get_vimp_est <- function(fit,
       dplyr::mutate(data_type = "RNA_processes")%>%
       dplyr::filter(`_times_` %in% !!landmark_time & `_permutation_` == 0)%>%
       pivot_longer(-c(`_times_`,`_permutation_`, data_type), 
-                   names_to = "label", 
+                   names_to = "variable", 
                    values_to = "est")
     
     vim_est <- list(dna_pathway, dna_process, rna_pathway, rna_process)%>%
       purrr::reduce(full_join, by = names(dna_pathway))%>%
       dplyr::rename(landmark_time = `_times_`)%>%
-      dplyr::mutate(label = gsub(" \\(DNA\\)| \\(RNA\\)","", label),
-                    est = ifelse(est<0, 0, est))%>%
-      left_join(get_pathways_process(), by = c("label","data_type"))
+      dplyr::mutate(
+        variable = gsub(" \\(DNA\\)| \\(RNA\\)","", variable),
+        est = ifelse(est<0, 0, est)
+      )
     
   }
   return(vim_est)
@@ -526,7 +529,7 @@ plot_vimp_est <- function(
     }
   }
   
-  label_col <- "label"
+  label_col <- "variable"
   
   required_cols <- if (method == "survML") {
     c("est", "cil_1sided", "ciu", "p", label_col)
@@ -942,7 +945,7 @@ tbl_vimp <- function(
   method <- dplyr::case_when(
     all(
       c(
-        "label", "est", "cil_1sided",
+        "variable", "est", "cil_1sided",
         "ciu", "p", "p_adj"
       ) %in% names(vims)
     ) ~ "survML",
@@ -996,7 +999,7 @@ tbl_vimp <- function(
     dat %>%
       gt::gt() %>%
       gt::cols_label(
-        label = gt::md("**Pathway**"),
+        variable = gt::md("**Pathway**"),
         est_ci = gt::md("**VIM [95% CI]**"),
         p = gt::md("***p*-value**"),
         p_adj = gt::md("***q*-value**")
@@ -1076,7 +1079,7 @@ tbl_vimp <- function(
           tables,
           ~ .x %>%
             dplyr::select(
-              label,
+              variable,
               est_ci,
               p,
               p_adj
@@ -1316,7 +1319,7 @@ tbl_top10_vimp <- function(
   method <- dplyr::case_when(
     all(
       c(
-        "label", "est", "cil_1sided",
+        "variable", "est", "cil_1sided",
         "ciu", "p", "p_adj"
       ) %in% names(vims)
     ) ~ "survML",
@@ -1402,7 +1405,7 @@ tbl_top10_vimp <- function(
       dplyr::group_by(
         landmark_time,
         data_type,
-        label
+        variable
       ) %>%
       dplyr::summarise(
         n_cohorts = dplyr::n_distinct(cohort),
@@ -1464,7 +1467,7 @@ tbl_top10_vimp <- function(
       gt::gt() %>%
       gt::cols_label(
         rank = gt::md("**Rank**"),
-        label = gt::md("**Pathway**"),
+        variable = gt::md("**Pathway**"),
         est_ci = gt::md("**VIM [95% CI]**"),
         p = gt::md("***p*-value**"),
         p_adj = gt::md("***q*-value**")
@@ -1489,7 +1492,7 @@ tbl_top10_vimp <- function(
       gt::gt() %>%
       gt::cols_label(
         rank = gt::md("**Rank**"),
-        label = gt::md("**Pathway**"),
+        variable = gt::md("**Pathway**"),
         est = gt::md("**VIM**")
       ) %>%
       gt::fmt_number(
@@ -1519,7 +1522,7 @@ tbl_top10_vimp <- function(
           ~ .x %>%
             dplyr::select(
               rank,
-              label,
+              variable,
               est_ci,
               p,
               p_adj
@@ -1535,7 +1538,7 @@ tbl_top10_vimp <- function(
         ~ .x %>%
           dplyr::select(
             rank,
-            label,
+            variable,
             est
           ) %>%
           .format_survex_table()
@@ -1570,7 +1573,7 @@ tbl_top10_vimp <- function(
         data_type == !!data_type,
         landmark_time == !!landmark_time
       ) %>%
-      dplyr::pull(label)
+      dplyr::pull(variable)
     
     add_common_note <- grepl(
       "pathways",
@@ -1584,10 +1587,10 @@ tbl_top10_vimp <- function(
         landmark_time == !!landmark_time
       ) %>%
       dplyr::mutate(
-        label = dplyr::if_else(
-          add_common_note & label %in% current_common,
-          paste0(label, "\u2020"),
-          label
+        variable = dplyr::if_else(
+          add_common_note & variable %in% current_common,
+          paste0(variable, "\u2020"),
+          variable
         ),
         cohort = dplyr::recode(
           cohort,
@@ -1602,7 +1605,7 @@ tbl_top10_vimp <- function(
         dplyr::select(
           cohort,
           rank,
-          label,
+          variable,
           est_ci,
           p,
           p_adj
@@ -1610,18 +1613,18 @@ tbl_top10_vimp <- function(
         tidyr::pivot_wider(
           id_cols = rank,
           names_from = cohort,
-          values_from = c(label, est_ci, p, p_adj),
+          values_from = c(variable, est_ci, p, p_adj),
           names_glue = "{.value}_{cohort}"
         ) %>%
         dplyr::select(
           rank,
           dplyr::any_of(
             c(
-              "label_raids",
+              "variable_raids",
               "est_ci_raids",
               "p_raids",
               "p_adj_raids",
-              "label_tcga",
+              "variable_tcga",
               "est_ci_tcga",
               "p_tcga",
               "p_adj_tcga"
@@ -1646,7 +1649,7 @@ tbl_top10_vimp <- function(
         tbl <- tbl %>%
           gt::tab_spanner(
             columns = gt::ends_with("_raids"),
-            label = gt::md("**Bio-RAIDs**")
+            variable = gt::md("**Bio-RAIDs**")
           )
       }
       
@@ -1654,7 +1657,7 @@ tbl_top10_vimp <- function(
         tbl <- tbl %>%
           gt::tab_spanner(
             columns = gt::ends_with("_tcga"),
-            label = gt::md("**TCGA-CESC**")
+            variable = gt::md("**TCGA-CESC**")
           )
       }
       
@@ -1662,11 +1665,11 @@ tbl_top10_vimp <- function(
         tbl %>%
           gt::cols_label(
             rank = gt::md("**Rank**"),
-            label_raids = gt::md("**Pathway**"),
+            variable_raids = gt::md("**Pathway**"),
             est_ci_raids = gt::md("**VIM [95% CI]**"),
             p_raids = gt::md("***p*-value**"),
             p_adj_raids = gt::md("***q*-value**"),
-            label_tcga = gt::md("**Pathway**"),
+            variable_tcga = gt::md("**Pathway**"),
             est_ci_tcga = gt::md("**VIM [95% CI]**"),
             p_tcga = gt::md("***p*-value**"),
             p_adj_tcga = gt::md("***q*-value**"),
@@ -1691,22 +1694,22 @@ tbl_top10_vimp <- function(
       dplyr::select(
         cohort,
         rank,
-        label,
+        variable,
         est
       ) %>%
       tidyr::pivot_wider(
         id_cols = rank,
         names_from = cohort,
-        values_from = c(label, est),
+        values_from = c(variable, est),
         names_glue = "{.value}_{cohort}"
       ) %>%
       dplyr::select(
         rank,
         dplyr::any_of(
           c(
-            "label_raids",
+            "variable_raids",
             "est_raids",
-            "label_tcga",
+            "variable_tcga",
             "est_tcga"
           )
         )
@@ -1719,7 +1722,7 @@ tbl_top10_vimp <- function(
       tbl <- tbl %>%
         gt::tab_spanner(
           columns = gt::ends_with("_raids"),
-          label = gt::md("**Bio-RAIDs**")
+          variable = gt::md("**Bio-RAIDs**")
         )
     }
 
@@ -1727,16 +1730,16 @@ tbl_top10_vimp <- function(
       tbl <- tbl %>%
         gt::tab_spanner(
           columns = gt::ends_with("_tcga"),
-          label = gt::md("**TCGA-CESC**")
+          variable = gt::md("**TCGA-CESC**")
         )
     }
     
     tbl %>%
       gt::cols_label(
         rank = gt::md("**Rank**"),
-        label_raids = gt::md("**Pathway**"),
+        variable_raids = gt::md("**Pathway**"),
         est_raids = gt::md("**VIM**"),
-        label_tcga = gt::md("**Pathway**"),
+        variable_tcga = gt::md("**Pathway**"),
         est_tcga = gt::md("**VIM**"),
         .fn = identity
       ) %>%
@@ -2146,7 +2149,7 @@ tbl_top_overlap_vimp <- function(vims, k = 10, B = 10000, seed = 123){
     group_split_custom(cohort, data_type, landmark_time)%>%
     purrr::map(
       ~.x %>% 
-        dplyr::select(label, est)%>%
+        dplyr::select(variable, est)%>%
         tibble::deframe()
     )%>%
     purrr::list_flatten()
