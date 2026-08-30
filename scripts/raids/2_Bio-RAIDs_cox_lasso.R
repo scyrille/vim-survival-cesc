@@ -1,16 +1,10 @@
 
-#'@description Cox regression with lasso penalties and likelihood-based boosting 
+#'@description Cox regression with lasso penalties 
 
 library(here)
 
 source(here::here("R","utils.R"))
 source(here::here("R","cox_lasso.R"))
-
-# library(furrr)
-# library(future)
-# message("Number of parallel workers: ", future::nbrOfWorkers())
-# future::plan(multisession, workers = 3)
-# message("Number of parallel workers: ", future::nbrOfWorkers())
 
 # Load data 
 raids <- read_processed(cohort = "raids")%>%
@@ -34,7 +28,9 @@ X_names <- raids %>%
   purrr::map(~.x %>% 
                dplyr::select(all_of(clin), 
                              tidyselect::matches(dna_pattern),
-                             tidyselect::matches(rna_pattern)) %>% 
+                             tidyselect::matches(rna_pattern),
+                             -dplyr::ends_with(c("two_genes","count","prop",
+                                                 "alteration_burden"))) %>% 
                names())
 
 # Define clinical, DNA and RNA groups 
@@ -46,20 +42,6 @@ group <- purrr::imap(
     stringr::str_starts(.x, rna_pattern)  ~ "RNA",
     TRUE ~ NA_character_))
   })
-
-index <- purrr::map(
-  X_names,
-  ~ {
-    has_dna <- any(stringr::str_starts(.x, dna_pattern))
-    
-    dplyr::case_when(
-      .x %in% clin ~ 1,
-      stringr::str_starts(.x, dna_pattern) ~ 2,
-      stringr::str_starts(.x, rna_pattern) ~ if (has_dna) 3 else 2,
-      TRUE ~ NA_real_
-    )
-  }
-)
 
 blocks_list <- purrr::map(
   X_names,
@@ -100,24 +82,18 @@ blocks_unpen_list <- purrr::map(
 # Lasso -------------------------------------------------------------------
 
 cox_lasso_fit <- raids %>%
-  # furrr::future_imap(
   purrr::imap(
     ~ fit_cox_lasso(
       time  = .x$time,
       event = .x$event,
       X     = .x %>% dplyr::select(all_of(X_names[[.y]])),
       seed  = 123
-    )#,
-    # .options = furrr::furrr_options(
-    #   seed     = TRUE,
-    #   packages = c("glmnet", "dplyr", "tidyselect", "labelled")
-    # )
+    )
   )
 
 # Group lasso -------------------------------------------------------------
 
 cox_group_lasso_fit <- raids %>%
-  # furrr::future_imap(
   purrr::imap(
     ~ fit_cox_group_lasso(
       time  = .x$time,
@@ -125,35 +101,12 @@ cox_group_lasso_fit <- raids %>%
       X     = .x %>% dplyr::select(all_of(X_names[[.y]])),
       group = group[[.y]], 
       seed  = 123
-    )#,
-    # .options = furrr::furrr_options(
-    #   seed     = TRUE,
-    #   packages = c("grpreg", "dplyr", "tidyselect", "labelled")
-    # )
+    )
   )
-
-# Sparse group lasso ------------------------------------------------------
-
-# cox_sparse_group_lasso_fit <- raids %>%
-#   # furrr::future_imap(
-#   purrr::imap(
-#     ~ fit_cox_sparse_group_lasso(
-#       time  = .x$time,
-#       event = .x$event,
-#       X     = .x %>% dplyr::select(all_of(X_names[[.y]])),
-#       index = index[[.y]],
-#       seed  = 123
-#     )#,
-#     # .options = furrr::furrr_options(
-#     #   seed     = TRUE,
-#     #   packages = c("SGL", "dplyr", "tidyselect", "labelled")
-#     # )
-#   )
 
 # Priority lasso ----------------------------------------------------------
 
 cox_priority_lasso_fit <- raids %>%
-  # furrr::future_imap(
   purrr::imap(
     ~ fit_cox_priority_lasso(
       time  = .x$time,
@@ -162,15 +115,10 @@ cox_priority_lasso_fit <- raids %>%
       blocks_list = blocks_list[[.y]], 
       block1_penalization = TRUE, 
       seed  = 123
-    )#,
-    # .options = furrr::furrr_options(
-    #   seed     = TRUE,
-    #   packages = c("prioritylasso", "dplyr", "tidyselect", "labelled")
-    # )
+    )
   )
 
 cox_priority_lasso_unpen_fit <- raids %>%
-  # furrr::future_imap(
   purrr::imap(
     ~ fit_cox_priority_lasso(
       time  = .x$time,
@@ -179,18 +127,14 @@ cox_priority_lasso_unpen_fit <- raids %>%
       blocks_list = blocks_unpen_list[[.y]], 
       block1_penalization = FALSE, 
       seed  = 123
-    )#,
-    # .options = furrr::furrr_options(
-    #   seed     = TRUE,
-    #   packages = c("prioritylasso", "dplyr", "tidyselect", "labelled")
-    # )
+    )
   )
   
-# plan(sequential)
-
 # ---------------------------- Save all results -------------------------#
 
 for (i in ls(pattern = "_fit")){
   saveRDS(get(i), here::here("outputs","results", paste0("raids_",i,".rds")),
           compress = FALSE)
 }
+
+rm(list = ls(pattern = "fit"))

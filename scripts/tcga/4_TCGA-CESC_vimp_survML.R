@@ -22,12 +22,14 @@ tcga <- read_processed(cohort = "tcga")
 #' that feature and evaluating its impact on model performance. 
 
 input_survML_full_fit <- tcga$pathway %>%
-  purrr::map(~.x %>% 
-               make_input_vimp_survML_full(
-                 var_clin = c("age","hpv_negative","figo"),
-                 dna_prefix = "genomic_pathway_",
-                 rna_prefix = "hallmark_"
-               )
+  purrr::map(
+    ~.x %>% 
+      make_input_vimp_survML_full(
+        var_clin = c("age","hpv_negative","figo"),
+        dna_prefix = "genomic_pathway_",
+        dna_suffix = "any_gene", 
+        rna_prefix = "hallmark_"
+    )
   )
 
 start <- Sys.time()
@@ -43,8 +45,6 @@ vimp_survML_full_fit <- input_survML_full_fit %>%
   )
 end <- Sys.time()
 vimp_survML_full_fit_runtime <- as.numeric(difftime(end, start, units = "mins"))
-
-# plan(sequential)
 
 # VIM relative to clinical features ---------------------------------------
 
@@ -182,3 +182,5 @@ vimp_survML_base_sens3_prop_fit_runtime <-
 for (i in setdiff(ls(pattern = "_fit|_runtime"), ls(pattern = "input"))){
   saveRDS(get(i), here::here("outputs","results", paste0("tcga_",i,".rds")))
 }
+
+rm(list = ls(pattern = "_fit"))

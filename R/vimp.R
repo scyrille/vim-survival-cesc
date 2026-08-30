@@ -335,10 +335,10 @@ make_input_vimp_survML_full <- function(data,
   dna_prefix <- strsplit(dna_prefix, "|", fixed = TRUE)[[1]]
   dna_suffix <- strsplit(dna_suffix, "|", fixed = TRUE)[[1]]
   rna_prefix <- strsplit(rna_prefix, "|", fixed = TRUE)[[1]]
-  
+
   X <- data %>%
     dplyr::select(
-      dplyr::all_of(var_clin),
+      dplyr::any_of(var_clin),
       dplyr::starts_with(dna_prefix) & dplyr::ends_with(dna_suffix),
       dplyr::starts_with(rna_prefix)
     )
@@ -348,10 +348,10 @@ make_input_vimp_survML_full <- function(data,
   
   dna_pathways <- paste0(which(startsWith(names(X), dna_prefix) & 
                                  endsWith(names(X), dna_suffix)))%>%
-    set_names(paste0(var_label(X[,as.integer(.)], unlist = T), " (DNA)"))
+    set_names(paste0(var_label(X[,as.integer(.)], unlist = T), " (DNA pathway)"))
   
   rna_pathways <- paste0(which(startsWith(names(X), rna_prefix)))%>%
-    set_names(paste0(var_label(X[,as.integer(.)], unlist = T), " (RNA)"))
+    set_names(paste0(var_label(X[,as.integer(.)], unlist = T), " (RNA pathway)"))
   
   feature_groups <- c(clin_features,
                       dna_pathways, 
@@ -395,7 +395,7 @@ make_input_vimp_survML_base <- function(data,
   dna_pathways_groups <- get_pathways_process() %>%
     dplyr::filter(data_type == "DNA_pathways") %>%
     dplyr::select(process, label) %>%
-    dplyr::transmute(process = paste0(process, " (DNA)"), label) %>%
+    dplyr::transmute(process, label) %>%
     dplyr::group_by(process) %>%
     dplyr::summarise(label = list(label), .groups = "drop") %>%
     tibble::deframe()%>%
@@ -403,17 +403,17 @@ make_input_vimp_survML_base <- function(data,
   
   rna_pathways_groups <- get_pathways_process() %>%
     dplyr::filter(data_type == "RNA_pathways") %>%
-    dplyr::transmute(process = paste0(process, " (RNA)"), label) %>%
+    dplyr::transmute(process, label) %>%
     dplyr::group_by(process) %>%
     dplyr::summarise(label = list(label), .groups = "drop") %>%
     tibble::deframe()%>%
     purrr::map(~ unname(rna_pathways[names(rna_pathways) %in% .x]))
   
   feature_groups <- c(
-    dna_pathways %>% set_names(paste0(names(.), " (DNA)")), 
-    rna_pathways %>% set_names(paste0(names(.), " (RNA)")), 
-    dna_pathways_groups,
-    rna_pathways_groups)
+    dna_pathways %>% set_names(paste0(names(.), " (DNA pathway)")), 
+    rna_pathways %>% set_names(paste0(names(.), " (RNA pathway)")), 
+    dna_pathways_groups %>% set_names(paste0(names(.), " (DNA process)")),
+    rna_pathways_groups %>% set_names(paste0(names(.), " (RNA process)")))
   
   list(time = data$time,
        event = data$event,
@@ -434,13 +434,18 @@ get_vimp_est <- function(fit,
     
     vim_est <- do.call(rbind, lapply(fit, function(x) x$result))%>%
       {rownames(.) <- NULL; .}%>%
-      left_join(get_pathways_process(), by = "variable")%>%
-      mutate(data_type = case_when(grepl("\\(DNA\\)", variable)~"DNA_processes",
-                                   grepl("\\(RNA\\)", variable)~"RNA_processes",
-                                   TRUE~data_type),
-             variable = gsub(" \\(DNA\\)| \\(RNA\\)", "", variable),
-             label = ifelse(is.na(label), variable, label)) %>%
-      dplyr::filter(!is.na(data_type) & landmark_time %in% !!landmark_time)%>%
+      dplyr::mutate(
+        data_type = case_when(
+          grepl("\\(DNA pathway\\)", variable)~"DNA_pathways",
+          grepl("\\(RNA pathway\\)", variable)~"RNA_pathways",
+          grepl("\\(DNA process\\)", variable)~"DNA_processes",
+          grepl("\\(RNA process\\)", variable)~"RNA_processes"), 
+        label = gsub(paste(c("\\(DNA pathway\\)",
+                             "\\(RNA pathway\\)",
+                             "\\(DNA process\\)",
+                             "\\(RNA process\\)"),
+                           collapse = "|"),"", variable))%>%
+      dplyr::filter(landmark_time %in% !!landmark_time)%>%
       dplyr::group_by(data_type) %>%
       dplyr::mutate(p_adj = p.adjust(p, method = "BH") ) %>%
       dplyr::ungroup()

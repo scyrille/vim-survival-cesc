@@ -28,6 +28,7 @@ combined_input_survML_base_fit <- combined$pathway$clin_dna_rna %>%
     data       = .x, 
     var_clin   = c("age","hpv_negative"),
     dna_prefix = "genomic_pathway_",
+    dna_suffix = "any_gene",
     rna_prefix = "hallmark_"
     )
   )
