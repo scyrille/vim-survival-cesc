@@ -32,7 +32,6 @@ input_survML_full_fit <- raids$pathway %>%
       )
     )
 
-start <- Sys.time()
 vimp_survML_full_fit <- input_survML_full_fit %>%
   purrr::map(
     ~ compute_vimp_survML_full(
@@ -41,10 +40,7 @@ vimp_survML_full_fit <- input_survML_full_fit %>%
         X              = .x$X,
         feature_groups = .x$feature_groups
         )
-    )%>%
-  set_names(names(raids$pathway))
-end <- Sys.time()
-vimp_survML_full_fit_runtime <- as.numeric(difftime(end, start, units = "mins"))
+    )
 
 vimp_survML_full_est <- vimp_survML_full_fit %>%
   purrr::map(
@@ -76,7 +72,6 @@ input_survML_base_fit <- raids$pathway$clin_dna_rna %>%
     rna_prefix = "hallmark_"
   )
 
-start <- Sys.time()
 vimp_survML_base_fit <- compute_vimp_survML_base(
     time           = input_survML_base_fit$time,
     event          = input_survML_base_fit$event,
@@ -85,9 +80,6 @@ vimp_survML_base_fit <- compute_vimp_survML_base(
     feature_groups = input_survML_base_fit$feature_groups, 
     SL.library     = SL.library
     )
-end <- Sys.time()
-vimp_survML_base_fit_runtime <- 
-  as.numeric(difftime(end, start, units = "mins"))
 
 vimp_survML_base_est <- get_vimp_est(
     fit = vimp_survML_base_fit, 
@@ -117,7 +109,6 @@ input_survML_base_sens1_adj_fit <- raids$pathway$clin_dna_rna %>%
     )
   )
 
-start <- Sys.time()
 vimp_survML_base_sens1_adj_fit <- compute_vimp_survML_base(
   time           = input_survML_base_sens1_adj_fit$time,
   event          = input_survML_base_sens1_adj_fit$event,
@@ -126,9 +117,6 @@ vimp_survML_base_sens1_adj_fit <- compute_vimp_survML_base(
   feature_groups = input_survML_base_sens1_adj_fit$feature_groups, 
   SL.library     = SL.library
 )
-end <- Sys.time()
-vimp_survML_base_sens1_adj_fit_runtime <- 
-  as.numeric(difftime(end, start, units = "mins"))
 
 vimp_survML_base_sens1_adj_est <- get_vimp_est(
   fit = vimp_survML_base_sens1_adj_fit, 
@@ -154,7 +142,6 @@ input_survML_base_sens2_two_genes_fit <- raids$pathway$clin_dna_rna %>%
     )
   )
 
-start <- Sys.time()
 vimp_survML_base_sens2_two_genes_fit <- compute_vimp_survML_base(
   time           = input_survML_base_sens2_two_genes_fit$time,
   event          = input_survML_base_sens2_two_genes_fit$event,
@@ -163,9 +150,6 @@ vimp_survML_base_sens2_two_genes_fit <- compute_vimp_survML_base(
   feature_groups = input_survML_base_sens2_two_genes_fit$feature_groups, 
   SL.library     = SL.library
 )
-end <- Sys.time()
-vimp_survML_base_sens2_two_genes_fit_runtime <- 
-  as.numeric(difftime(end, start, units = "mins"))
 
 vimp_survML_base_sens2_two_genes_est <- get_vimp_est(
   fit = vimp_survML_base_sens2_two_genes_fit, 
@@ -189,7 +173,6 @@ input_survML_base_sens3_prop_fit <- raids$pathway$clin_dna_rna %>%
     )
   )
 
-start <- Sys.time()
 vimp_survML_base_sens3_prop_fit <- compute_vimp_survML_base(
   time           = input_survML_base_sens3_prop_fit$time,
   event          = input_survML_base_sens3_prop_fit$event,
@@ -198,9 +181,6 @@ vimp_survML_base_sens3_prop_fit <- compute_vimp_survML_base(
   feature_groups = input_survML_base_sens3_prop_fit$feature_groups, 
   SL.library     = SL.library
 )
-end <- Sys.time()
-vimp_survML_base_sens3_prop_fit_runtime <- 
-  as.numeric(difftime(end, start, units = "mins"))
 
 vimp_survML_base_sens3_prop_est <- get_vimp_est(
   fit = vimp_survML_base_sens3_prop_fit, 
@@ -210,6 +190,6 @@ vimp_survML_base_sens3_prop_est <- get_vimp_est(
 
 # ---------------------------- Save all results -------------------------#
 
-for (i in setdiff(ls(pattern = "_est|_fit|_runtime"), ls(pattern = "input"))){
+for (i in setdiff(ls(pattern = "_est|_fit"), ls(pattern = "input"))){
   saveRDS(get(i), here::here("outputs","results", paste0("raids_",i,".rds")))
 }

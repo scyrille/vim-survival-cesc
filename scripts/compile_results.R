@@ -301,7 +301,7 @@ tbl_cox_univ_multi_pathway_cox_lboost_select <- list(
 
 # Load results 
 vimp_survML_full_est <- readRDS(
-  here::here("outputs","results","raids_vimp_survML_full_est.RDS")
+  here::here("outputs","results","raids_vimp_survML_full_est.rds")
   )%>%
   purrr::map(~.x %>% dplyr::mutate(data_type = tolower(data_type)))
 

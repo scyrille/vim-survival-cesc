@@ -362,12 +362,24 @@ plot_process_panel <- function(df_long, fun, stats_df = NULL,
                                widths = c(1, 1), 
                                heights = c(1, 1), ...) {
   
+  if(grepl("genomic_pathway", df_long$variable_name[1])){
+    suffix <- df_long$variable_name %>%
+      stringr::str_extract("(any_gene|two_genes|prop|count)$") %>%
+      stats::na.omit()%>%
+      unique()
+    
+    pathways_process <- get_pathways_process() %>%
+      dplyr::mutate(variable_name = paste0(variable_name, "_", suffix))
+  } else {
+    pathways_process <- get_pathways_process()
+  }
+  
   df_long <- df_long %>%
-    dplyr::left_join(get_pathways_process(), by = "variable_name")
+    dplyr::left_join(pathways_process, by = "variable_name")
   
   if (!is.null(stats_df)) {
     stats_df <- stats_df %>%
-      dplyr::left_join(get_pathways_process(), by = "variable_name")
+      dplyr::left_join(pathways_process, by = "variable_name")
   }
   
   df_p1 <- df_long %>%
@@ -458,6 +470,8 @@ plot_continuous <- function(df,
   
   vars <- names(dplyr::select(df, dplyr::starts_with(var_prefix)))
   
+  lab_map <- var_label(df[,vars])
+  
   df_long <- df %>%
     dplyr::select(
       dplyr::any_of(if (with_group) group_var),
@@ -481,9 +495,6 @@ plot_continuous <- function(df,
                        legend.position,
                        legend.direction) {
     
-    lab_map <- setNames(get_pathways_process()$label,
-                        get_pathways_process()$variable_name)
-    
     if (with_group) {
       plot <- ggplot2::ggplot(
         df_long,
@@ -494,12 +505,12 @@ plot_continuous <- function(df,
         )
       ) +
         ggplot2::geom_boxplot() +
-        # ggpubr::stat_compare_means(
-        #   ggplot2::aes(group = .data[[group_var]]),
-        #   method = "wilcox.test",
-        #   label = "p.signif",
-        #   colour = "#F8766D"
-        # ) +
+        ggpubr::stat_compare_means(
+          ggplot2::aes(group = .data[[group_var]]),
+          method = "wilcox.test",
+          label = "p.signif",
+          colour = "#F8766D"
+        ) +
         ggplot2::scale_x_discrete(labels = lab_map) +
         ggplot2::scale_fill_manual(values = fill_values)
     } else {
@@ -600,6 +611,8 @@ plot_dichotomous <- function(df,
                               dplyr::starts_with(var_prefix) &
                                 dplyr::ends_with(var_suffix)))
   
+  lab_map <- var_label(df[,vars])
+  
   df_raw <- df %>%
     dplyr::select(
       dplyr::any_of(if (with_group) group_var),
@@ -658,15 +671,12 @@ plot_dichotomous <- function(df,
                        legend.position,
                        legend.direction) {
     
-    lab_map <- setNames(get_pathways_process()$label,
-                        get_pathways_process()$variable_name)
-    
     if (with_group) {
       plot <- ggplot2::ggplot(
         df_long,
         ggplot2::aes(
-          # x = stats::reorder(.data[["variable"]], .data[["value"]]),
-          x = .data[["variable_name"]],
+          x = if (process_panel) .data[["variable_name"]] else 
+            x = stats::reorder(.data[["variable_name"]], .data[["value"]]),
           y = .data[["value"]],
           fill = .data[[group_var]]
         )
@@ -681,8 +691,8 @@ plot_dichotomous <- function(df,
       plot <- ggplot2::ggplot(
         df_long,
         ggplot2::aes(
-          # x = stats::reorder(.data[["variable"]], .data[["value"]]),
-          x = .data[["variable_name"]],
+          x = if (process_panel) .data[["variable_name"]] else 
+            x = stats::reorder(.data[["variable_name"]], .data[["value"]]),
           y = .data[["value"]]
         )
       ) +
@@ -702,17 +712,17 @@ plot_dichotomous <- function(df,
       ymax <- max(df_long$value, na.rm = TRUE)
       
       plot <- plot +
-        # ggplot2::geom_text(
-        #   data = stats_df,
-        #   ggplot2::aes(
-        #     x = .data[["variable_name"]],
-        #     y = 0.58,
-        #     label = .data[["pval_stars"]]
-        #   ),
-        #   inherit.aes = FALSE,
-        #   size = 6,
-        #   colour = "#F8766D"
-        # ) +
+        ggplot2::geom_text(
+          data = stats_df,
+          ggplot2::aes(
+            x = .data[["variable_name"]],
+            y = 0.58,
+            label = .data[["pval_stars"]]
+          ),
+          inherit.aes = FALSE,
+          size = 6,
+          colour = "#F8766D"
+        ) +
         ggplot2::expand_limits(y = 0.6 * ymax)
     }
     

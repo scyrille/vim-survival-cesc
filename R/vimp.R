@@ -378,8 +378,7 @@ make_input_vimp_survML_base <- function(data,
     dplyr::select(
       dplyr::all_of(var_clin),
       dplyr::starts_with(dna_prefix) & dplyr::ends_with(dna_suffix),
-      dplyr::starts_with(rna_prefix),
-      -matches("genomic_pathway_others")
+      dplyr::starts_with(rna_prefix)
     )
   
   base_features <- paste0(which(names(X) %in% var_clin))%>%
@@ -436,7 +435,7 @@ get_vimp_est <- function(fit,
       {rownames(.) <- NULL; .}%>%
       dplyr::mutate(
         data_type = case_when(
-          grepl("\\(Clinical\\)", variable~"Clinical"), 
+          grepl("\\(Clinical\\)", variable)~"Clinical", 
           grepl("\\(DNA pathway\\)", variable)~"DNA_pathways",
           grepl("\\(RNA pathway\\)", variable)~"RNA_pathways",
           grepl("\\(DNA process\\)", variable)~"DNA_processes",

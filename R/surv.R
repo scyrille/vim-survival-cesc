@@ -824,7 +824,7 @@ compute_global_test <- function(data_gene,
   }
   
   gt_clin <- tibble(
-    data_type = "Clinical",
+    data_type = "Clinicobiological",
     .gt_surv(data_gene, clin)
     )
   gt_dna <- tibble(

@@ -33,23 +33,29 @@ combined_input_survML_base_fit <- combined$pathway$clin_dna_rna %>%
     )
   )
 
-start <- Sys.time()
 combined_vimp_survML_base_fit <- combined_input_survML_base_fit %>%
-  purrr::map(~compute_vimp_survML_base(
-    time           = .x$time,
-    event          = .x$event,
-    X              = .x$X,
-    base_features  = .x$base_features, 
-    feature_groups = .x$feature_groups, 
-    SL.library     = SL.library
+  purrr::map(
+    ~compute_vimp_survML_base(
+      time           = .x$time,
+      event          = .x$event,
+      X              = .x$X,
+      base_features  = .x$base_features,
+      feature_groups = .x$feature_groups, 
+      SL.library     = SL.library
     )
   )
-end <- Sys.time()
-combined_vimp_survML_base_fit_runtime <- 
-  as.numeric(difftime(end, start, units = "mins"))
+
+combined_vimp_survML_base_est <- combined_vimp_survML_base_fit %>%
+  purrr::map(
+    ~get_vimp_est(
+      fit = .x, 
+      landmark_time = 24, 
+      method = "survML"
+    )
+  )
 
 # ---------------------------- Save all results -------------------------#
 
-for (i in setdiff(ls(pattern = "_fit|_runtime"), ls(pattern = "input"))){
+for (i in setdiff(ls(pattern = "_fit|_est"), ls(pattern = "input"))){
   saveRDS(get(i), here::here("outputs","results", paste0(i,".rds")))
 }

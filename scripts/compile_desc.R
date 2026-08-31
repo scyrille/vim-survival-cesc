@@ -16,9 +16,9 @@ data %>%
   set_names(data)%>%
   list2env(.GlobalEnv)
 
-labelled::var_label(raids$pathway$clin_dna_rna) <- labels
-labelled::var_label(tcga$pathway$clin_dna_rna) <- labels
-labelled::var_label(combined$pathway$clin_dna_rna) <- labels
+# labelled::var_label(raids$pathway$clin_dna_rna) <- labels
+# labelled::var_label(tcga$pathway$clin_dna_rna) <- labels
+# labelled::var_label(combined$pathway$clin_dna_rna) <- labels
 
 combined_sets <- list(
   clin           = combined$clin, 
@@ -26,7 +26,7 @@ combined_sets <- list(
   rna            = combined$clin %>% drop_na(rna),
   clin_dna_rna   = combined$clin %>% drop_na(clin, dna, rna) 
 )
-               
+
 ## Venn diagrams ----
 
 venn_diagram_sequencing <- combined$clin %>%
@@ -112,9 +112,23 @@ tbl_combined_pat_char <- combined$pathway$clin_dna_rna %>%
 ## Genomic alteration burden ----
 
 tbl_compare_dna_burden <- combined$pathway$clin_dna_rna %>%
-  dplyr::select(cohort, genomic_pathway_alteration_burden)%>%
-  tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
-  add_p(test = everything()~"fisher.test")%>%
+  dplyr::mutate(
+    genomic_pathway_alteration_burden_c_f = factor(
+      ifelse(genomic_pathway_alteration_burden == 0, 0, 1), 
+      0:1, c(0,"\u22651")))%>%
+  set_variable_labels(genomic_pathway_alteration_burden_c_f = 
+                        "Presence of genomic alterations")%>%
+  dplyr::select(cohort, 
+                genomic_pathway_alteration_burden,
+                genomic_pathway_alteration_burden_c_f)%>%
+  tbl_summary(by = cohort, 
+              digits = everything()~c(0,0),
+              type = list(all_continuous()~"continuous2"),
+              statistic = list(all_continuous()~c("{mean} ({sd})",
+                                              "{median} ({p25}, {p75})",
+                                              "{min}, {max}")))%>%
+  add_p(test = all_categorical()~"fisher.test")%>%
+  bold_p()%>%
   modify_header(label = "")%>%
   bold_labels()
 
@@ -124,7 +138,7 @@ tbl_compare_dna_burden <- combined$pathway$clin_dna_rna %>%
 
 # Without panels
 plot_dichotomous(df                = combined$pathway$clin_dna_rna %>%
-                   dplyr::select(-genomic_pathway_others),
+                   dplyr::select(-genomic_pathway_others_any_gene),
                  var_prefix        = "genomic_pathway_",
                  var_suffix        = "any_gene", 
                  with_group        = TRUE,
@@ -159,7 +173,28 @@ tbl_compare_dna_pathways <- combined$pathway$clin_dna_rna %>%
   dplyr::select(cohort, starts_with("genomic_pathway") & 
                   ends_with("any_gene"))%>%
   tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
+  # add_p(test = everything()~"fisher.test")%>%
+  modify_header(label = "")%>%
+  bold_labels()
+
+# show all levels 
+tbl_compare_dna_pathways_one_gene <- combined$pathway$clin_dna_rna %>%
+  dplyr::select(cohort, starts_with("genomic_pathway") & 
+                  ends_with("any_gene"), -genomic_pathway_others_any_gene)%>%
+  dplyr::mutate(across(ends_with("any_gene"),
+                       ~factor(.x, 0:1, c("Non-altered","Altered"))))%>%
+  dplyr::rename_with(~ gsub("_any_gene$", "", .x), 
+                     dplyr::ends_with("_any_gene") )%>%
+  set_variable_labels(
+    .labels = var_label(
+      combined$pathway$clin_dna_rna %>%
+        dplyr::select(ends_with("any_gene"),  
+                      -genomic_pathway_others_any_gene))%>%
+      set_names(gsub("_any_gene", "", names(.)))
+  )%>%
+  tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
   add_p(test = everything()~"fisher.test")%>%
+  bold_p()%>%
   modify_header(label = "")%>%
   bold_labels()
 
@@ -178,40 +213,52 @@ tbl_combined_dna_pathways <- combined$pathway$clin_dna_rna %>%
   )
 
 ### Other definitions ----
+
+# At least 2 altered genes
 tbl_compare_dna_pathways_two_genes <- combined$pathway$clin_dna_rna %>%
   dplyr::select(cohort, starts_with("genomic_pathway") & 
-                  ends_with("two_genes"))%>%
+                  ends_with("two_genes"), -genomic_pathway_others_two_genes)%>%
+  dplyr::mutate(across(ends_with("two_genes"),
+                       ~factor(.x, 0:1, c("Non-altered","Altered"))))%>%
+  dplyr::rename_with(~ gsub("_two_genes$", "", .x), 
+                     dplyr::ends_with("_two_genes") )%>%
+  set_variable_labels(
+    .labels = var_label(
+      combined$pathway$clin_dna_rna %>%
+        dplyr::select(ends_with("two_genes"),  
+                      -genomic_pathway_others_two_genes))%>%
+      set_names(gsub("_two_genes", "", names(.)))
+  )%>%
   tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
   add_p(test = everything()~"fisher.test")%>%
+  bold_p()%>%
   modify_header(label = "")%>%
   bold_labels()
 
-# tbl_compare_dna_pathways_count <- combined$pathway$clin_dna_rna %>%
-#   dplyr::select(cohort, starts_with("genomic_pathway") &
-#                   ends_with("count"))%>%
-#   tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
-#   add_p(test = everything()~"fisher.test")%>%
-#   modify_header(label = "")%>%
-#   bold_labels()
+tbl_compare_dna_pathways_one_two_genes <- list(
+  tbl_compare_dna_pathways_one_gene,
+  tbl_compare_dna_pathways_two_genes)%>%
+  tbl_merge(tab_spanner = c("**At least one altered gene**",
+                            "**At least two altered genes**"))
 
-tbl_compare_dna_pathways_prop <- combined$pathway$clin_dna_rna %>%
-  dplyr::select(cohort, starts_with("genomic_pathway") & 
-                  ends_with("prop"))%>%
-  tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
-  add_p(test = everything()~"fisher.test")%>%
-  modify_header(label = "")%>%
-  bold_labels()
-
-tbl_compare_dna_pathways_all <- list(
-  tbl_compare_dna_pathways, 
-  tbl_compare_dna_pathways_two_genes,
-  # tbl_compare_dna_pathways_count,
-  tbl_compare_dna_pathways_prop
-)%>%
-  tbl_merge(tab_spanner = c("**Any gene**",
-                            "**At least two genes**",
-                            # "**Number of constituent altered genes**", 
-                            "**Proportion of constituent altered genes**"))
+# Pathway-specific genomic alteration burden 
+plot_continuous(combined$pathway$clin_dna_rna %>%
+                  dplyr::select(cohort, starts_with("genomic_pathway") &
+                                  ends_with("prop"),
+                                -genomic_pathway_others_prop),
+                var_prefix = "genomic_pathway",
+                with_group = TRUE,
+                group_var = "cohort",
+                xlab = "",
+                ylab = "Pathway-specific genomic alteration burden",
+                fill_values = c("Bio-RAIDs" = "#1b9e77",
+                                "TCGA-CESC" = "#377eb8"),
+                legend.position = "top",
+                legend.direction = "horizontal",
+                ylim = c(0, 1),
+                process_panel = F)%>%
+  save_plot(here::here("outputs","figures"), 
+            "compare_boxplot_dna_pathways_prop", 15, 20)
 
 ## RNA-based pathway activity scores ----
 
@@ -249,8 +296,6 @@ tbl_compare_rna_pathways <- combined$pathway$clin_dna_rna %>%
   dplyr::select(cohort, starts_with("hallmark_"))%>%
   tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
   add_p(test = everything()~"wilcox.test")%>%
-  add_q(method = "BH")%>%
-  bold_p(q = TRUE)%>%
   modify_header(label = "")%>%
   bold_labels()
 
@@ -376,26 +421,18 @@ plot_surv(formula      = list(Surv(time, event) ~ cohort),
              "compare_surv_plot_clin_dna_rna_cohort_2", 6, 5.8, newpage = F)
 
 # With survival tables 
-pfs_surv_plots <- combined_sets %>%
-  purrr::map(
-    ~.x %>%
-      plot_surv_table(
-        formula      = Surv(time, event) ~ cohort,
-        data         = .x, 
-        palette = c("#1b9e77","#377eb8")
-      )
-    )
+pfs_surv_plots <- plot_surv_table(
+  formula      = Surv(time, event) ~ cohort,
+  data         = combined_sets$clin_dna_rna, 
+  palette      = c("#1b9e77","#377eb8")
+) 
 
-for (i in seq_along(pfs_surv_plots)){
-  png(here::here("outputs","figures", 
-                 paste0("compare_surv_plot_",
-                        names(pfs_surv_plots)[[i]], 
-                        "_cohort_table.png")), 
-      width = 5.6*330, height = 4.2*330, res = 300)
-  grid::grid.newpage()
-  grid::grid.draw(pfs_surv_plots[[i]][["grob"]])
-  dev.off()
-}
+png(here::here("outputs","figures", 
+               paste0("compare_surv_plot_clin_dna_rna_cohort_table.png")), 
+    width = 5.6*330, height = 4.2*330, res = 300)
+grid::grid.newpage()
+grid::grid.draw(pfs_surv_plots[["grob"]])
+dev.off()
 
 ## Progression-free survival on subsets defined by variables 
 combined$pathway$clin_dna_rna %>%
@@ -431,23 +468,38 @@ tbl_compare_surv <- combined_sets %>%
 # Cox proportional hazards models -----------------------------------------
 
 ## Clinical features
-tbl_compare_cox_univ <- tbl_cox(
-  data   = combined$pathway$clin_dna_rna,
-  time   = "time",
-  event  = "event",
-  strata = "cohort",
-  covars = c("age_c_f", "figo_c_f", "hpv_negative_f"),
-  model  = "univ"
-)
+tbl_compare_cox_univ <- list(
+  tbl_cox(
+    data   = raids$pathway$clin_dna_rna,
+    time   = "time",
+    event  = "event",
+    covars = c("age_c_f", "figo_c_f", "hpv_negative_f","necrosis_f"),
+    model  = "univ"),
+  tbl_cox(
+    data   = tcga$pathway$clin_dna_rna,
+    time   = "time",
+    event  = "event",
+    covars = c("age_c_f", "figo_c_f", "hpv_negative_f"),
+    model  = "univ")
+)%>%
+  tbl_merge(tab_spanner = c("**Bio-RAIDs**","**TCGA-CESC**"))
 
-tbl_compare_cox_multi <- tbl_cox(
-  data   = combined$pathway$clin_dna_rna,
-  time   = "time",
-  event  = "event",
-  strata = "cohort",
-  covars = c("age_c_f", "figo_c_f", "hpv_negative_f"),
-  model  = "multi"
-)
+tbl_compare_cox_multi <- list(
+  tbl_cox(
+    data   = raids$pathway$clin_dna_rna,
+    time   = "time",
+    event  = "event",
+    covars = c("age_c_f", "figo_c_f", "hpv_negative_f","necrosis_f"),
+    model  = "multi"),
+  tbl_cox(
+    data   = tcga$pathway$clin_dna_rna,
+    time   = "time",
+    event  = "event",
+    covars = c("age_c_f", "figo_c_f", "hpv_negative_f"),
+    model  = "multi")
+)%>%
+  tbl_merge(tab_spanner = c("**Bio-RAIDs**","**TCGA-CESC**"))
+
 
 # Global test -------------------------------------------------------------
 
@@ -476,7 +528,7 @@ tbl_compare_global_test <-
   gt::tab_spanner(label = gt::md("**Bio-RAIDs**"), columns = matches("raids"))%>%
   gt::tab_spanner(label = gt::md("**TCGA-CESC**"), columns = matches("tcga"))%>%
   gt::cols_label(data_type = gt::md("**Data type**"), 
-                 starts_with("x_cov")~ gt::md("**N.<br>features**"),
+                 starts_with("x_cov")~ gt::md("**No of<br>features**"),
                  starts_with("statistic")~ gt::md("**Statistic**"),
                  starts_with("expected")~ gt::md("**Expected**"),
                  starts_with("std_dev")~ gt::md("**Standard<br>deviation**"),
@@ -494,14 +546,13 @@ tbl_compare_global_test <-
                    formatC(x, format = "f", digits = 2))))%>%
   gt::tab_source_note(
     source_note = paste(
-      "Clinical: clinical features",
+      "Clinicobiological features",
       "DNA: gene-level DNA alterations features",
       "RNA: gene-level expression features",
       "DNA_pathways: DNA-based pathways features",
       "RNA_pathways: RNA-based pathways features",
       sep = "; ")
   )
-
 
 # ---------------------------- Save all tables --------------------------#
 

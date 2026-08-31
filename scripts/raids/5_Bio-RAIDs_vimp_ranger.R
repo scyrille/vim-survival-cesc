@@ -98,5 +98,3 @@ vimp_ranger_survex_fit <- list(
 
 saveRDS(vimp_ranger_survex_fit, 
         here::here("outputs","results", "raids_vimp_survex_fit.rds"))
-
-rm(list = ls(pattern = "fit"))

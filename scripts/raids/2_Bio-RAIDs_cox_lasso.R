@@ -136,5 +136,3 @@ for (i in ls(pattern = "_fit")){
   saveRDS(get(i), here::here("outputs","results", paste0("raids_",i,".rds")),
           compress = FALSE)
 }
-
-rm(list = ls(pattern = "fit"))
