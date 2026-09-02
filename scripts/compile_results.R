@@ -489,7 +489,7 @@ tbl_vimp_survML_base_sens1_adj_top10_overlap <- tbl_top_overlap_vimp(
 
 #### Alternative DNA pathway definitions ----
 
-##### At least two altered genes ----
+# At least two altered genes 
 
 # Load all results 
 vimp_survML_base_sens2_two_genes_est <- cohorts %>%
@@ -511,31 +511,6 @@ tbl_compare_vimp_survML_base_sens2_two_genes_top10 <- tbl_top10_vimp(
 # Cross-cohort comparison 
 tbl_vimp_survML_base_sens2_two_genes_top10_overlap <- tbl_top_overlap_vimp(
   vims = vimp_survML_base_sens2_two_genes_est, 
-  k = 10
-)
-
-##### Proportion of constituent altered genes ----
-
-# Load all results
-vimp_survML_base_sens3_prop_est <- cohorts %>%
-  purrr::map(~readRDS(here::here(
-    "outputs","results",
-    paste0(.x,"_vimp_survML_base_sens3_prop_est.rds"))))%>%
-  set_names(cohorts_name) %>%
-  purrr::imap(~.x %>% mutate(cohort = .y))%>%
-  bind_rows()%>%
-  dplyr::mutate(data_type = tolower(data_type))
-
-# Summary table of top-10 ranked pathways
-tbl_compare_vimp_survML_base_sens3_prop_top10 <- tbl_top10_vimp(
-  vims    = vimp_survML_base_sens3_prop_est,
-  compare = TRUE,
-  n_top   = 10
-)
-
-# Cross-cohort comparison 
-tbl_vimp_survML_base_sens3_prop_top10_overlap <- tbl_top_overlap_vimp(
-  vims = vimp_survML_base_sens3_prop_est, 
   k = 10
 )
 

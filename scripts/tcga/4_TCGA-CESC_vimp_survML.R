@@ -48,8 +48,7 @@ vimp_survML_base_est <- get_vimp_est(
 
 ## Sensitivity analyses ----
 
-SL.library <- make_SL_library() %>% 
-  subset(.!="ridge_1") # remove ridge
+SL.library <- make_SL_library()
 
 ### Adjustment on genomic alteration burden ----
 input_survML_base_sens1_adj_fit <- tcga$pathway$clin_dna_rna %>%
@@ -58,14 +57,7 @@ input_survML_base_sens1_adj_fit <- tcga$pathway$clin_dna_rna %>%
                  "genomic_pathway_alteration_burden"),
     dna_prefix = "genomic_pathway_",
     dna_suffix = "any_gene", 
-    rna_prefix = ""
-  )%>%
-  purrr::modify_in(
-    "feature_groups",
-    ~ purrr::discard(
-      .x,
-      ~ length(.x) == 0L || identical(.x, "")
-    )
+    rna_prefix = "hallmark"
   )
 
 vimp_survML_base_sens1_adj_fit <- compute_vimp_survML_base(
@@ -83,22 +75,38 @@ vimp_survML_base_sens1_adj_est <- get_vimp_est(
   method = "survML"
 )
 
-### Alternative DNA pathway definitions ----
+### Alternative DNA pathway definition ----
 
 # At least two altered genes 
+
+# Remove non-altered pathway features 
+dna_non_altered_pathways <- tcga$pathway$clin_dna_rna %>%
+  dplyr::select(dplyr::starts_with("genomic_pathway") &
+                  ends_with("two_genes"))%>%
+  dplyr::summarise(
+    dplyr::across(everything(),
+                  ~ sum(. == 1, na.rm = TRUE) / dplyr::n())
+  ) %>%
+  dplyr::select(where(~ .x == 0))%>%
+  colnames()
+
 input_survML_base_sens2_two_genes_fit <- tcga$pathway$clin_dna_rna %>%
+  dplyr::select(-starts_with(dna_non_altered_pathways))%>%
   make_input_vimp_survML_base(
-    var_clin = c("age","hpv_negative","figo"),
-    dna_prefix = "genomic_pathway_",
-    dna_suffix = "two_genes", 
-    rna_prefix = ""
+    var_clin   = c("age", "hpv_negative", "figo"),
+    dna_prefix = "genomic_pathway",
+    dna_suffix = "two_genes",
+    rna_prefix = "hallmark"
   )%>%
   purrr::modify_in(
     "feature_groups",
-    ~ purrr::discard(
-      .x,
-      ~ length(.x) == 0L || identical(.x, "")
-    )
+    \(x) {
+      remove <- endsWith(names(x), "(DNA process)") |
+        endsWith(names(x), "(RNA process)") |
+        endsWith(names(x), "(RNA pathway)")
+      
+      x[!remove]
+    }
   )
 
 vimp_survML_base_sens2_two_genes_fit <- compute_vimp_survML_base(
@@ -112,37 +120,6 @@ vimp_survML_base_sens2_two_genes_fit <- compute_vimp_survML_base(
 
 vimp_survML_base_sens2_two_genes_est <- get_vimp_est(
   fit = vimp_survML_base_sens2_two_genes_fit, 
-  landmark_time = 24, 
-  method = "survML"
-)
-
-# Proportion of constituent altered genes 
-input_survML_base_sens3_prop_fit <- tcga$pathway$clin_dna_rna %>%
-  make_input_vimp_survML_base(
-    var_clin = c("age","hpv_negative","figo"),
-    dna_prefix = "genomic_pathway_",
-    dna_suffix = "prop", 
-    rna_prefix = ""
-  )%>%
-  purrr::modify_in(
-    "feature_groups",
-    ~ purrr::discard(
-      .x,
-      ~ length(.x) == 0L || identical(.x, "")
-    )
-  )
-
-vimp_survML_base_sens3_prop_fit <- compute_vimp_survML_base(
-  time           = input_survML_base_sens3_prop_fit$time,
-  event          = input_survML_base_sens3_prop_fit$event,
-  X              = input_survML_base_sens3_prop_fit$X,
-  base_features  = input_survML_base_sens3_prop_fit$base_features, 
-  feature_groups = input_survML_base_sens3_prop_fit$feature_groups, 
-  SL.library     = SL.library
-)
-
-vimp_survML_base_sens3_prop_est <- get_vimp_est(
-  fit = vimp_survML_base_sens3_prop_fit, 
   landmark_time = 24, 
   method = "survML"
 )

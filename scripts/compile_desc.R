@@ -71,6 +71,23 @@ tbl_compare_pat_char <- combined$pathway$clin_dna_rna %>%
   bold_labels()%>%
   modify_footnote(everything()~NA)
 
+tbl_compare_pat_char2 <- combined$pathway$clin_dna_rna %>%
+  dplyr::select(cohort, age_c_f, figo_c_f, histo_f, hpv_negative_f,
+                necrosis_f)%>%
+  tbl_summary(by = cohort, digits = list(everything()~0), 
+              type = list(c(hpv_negative_f,necrosis_f) ~ "categorical"))%>%
+  add_p(test = all_categorical()~"fisher.test")%>%
+  bold_p()%>%
+  modify_header(label="")%>%
+  bold_labels()%>%
+  modify_footnote(everything()~NA)%>%
+  modify_table_body(
+    ~.x %>%
+      dplyr::filter(label!="Unknown")%>%
+      dplyr::mutate(stat_2 = ifelse(variable == "necrosis_f", "", stat_2),
+                    p.value = ifelse(variable == "necrosis_f", NA, p.value))
+  )
+
 tbl_compare_pat_char_omics_sets <- list(
   combined$clin,
   combined$clin %>% drop_na(dna),
@@ -81,7 +98,7 @@ tbl_compare_pat_char_omics_sets <- list(
         dplyr::select(cohort, age_c_f, figo_c_f, histo_f, hpv_negative_f)%>%
         tbl_summary(by = cohort, digits = list(everything()~0), 
                     type = list(c(hpv_negative_f) ~ "categorical"))%>%
-        add_p()%>%
+        add_p(test = all_categorical()~"fisher.test")%>%
         bold_p())%>%
   tbl_merge(tab_spanner = c("**Whole cohort**",
                             "**Genomic data set**",
@@ -102,7 +119,7 @@ tbl_combined_pat_char <- combined$pathway$clin_dna_rna %>%
         type = list(hpv_negative_f ~ "categorical")
       ) %>%
       add_overall() %>%
-      add_p() %>%
+      add_p(test = all_categorical()~"fisher.test") %>%
       bold_p() %>%
       modify_header(label = "") %>%
       bold_labels() %>%
