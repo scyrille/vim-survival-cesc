@@ -29,8 +29,7 @@ rna_process_labels <- pathways_process %>%
   distinct()%>%
   pull()
 
-combined <- read_processed("combined")$pathway$clin_dna_rna %>%
-  set_variable_labels(.labels = labels)
+combined <- read_processed("combined")$pathway$clin_dna_rna 
 raids <- read_processed("raids")
 tcga <- read_processed("tcga")
  
@@ -303,7 +302,12 @@ tbl_cox_univ_multi_pathway_cox_lboost_select <- list(
 vimp_survML_full_est <- readRDS(
   here::here("outputs","results","raids_vimp_survML_full_est.rds")
   )%>%
-  purrr::map(~.x %>% dplyr::mutate(data_type = tolower(data_type)))
+  purrr::map(~.x %>% 
+               left_join(pathways_process %>%
+                           dplyr::select(label, data_type, process)%>%
+                           dplyr::rename(variable = label), 
+                         by = c("variable","data_type"))%>%
+               dplyr::mutate(data_type = tolower(data_type)))
 
 # Plots of VIMs
 vimp_survML_full_est_split <- vimp_survML_full_est %>%
@@ -343,12 +347,18 @@ tbl_compare_vimp_survML_full_top10 <- vimp_survML_full_est %>%
 ### Main analysis ----
 
 # Load all results 
+ 
+
 vimp_survML_base_est <- cohorts %>%
   purrr::map(~readRDS(here::here("outputs","results",
                                  paste0(.x,"_vimp_survML_base_est.rds"))))%>%
   set_names(cohorts_name)%>%
   purrr::imap(~.x %>% mutate(cohort = .y))%>%
   bind_rows()%>%
+  left_join(pathways_process %>%
+              dplyr::select(label, data_type, process)%>%
+              dplyr::rename(variable = label), 
+            by = c("variable","data_type"))%>%
   dplyr::mutate(data_type = tolower(data_type))
 
 # Plots of VIMs
@@ -472,24 +482,46 @@ vimp_survML_base_sens1_adj_est <- cohorts %>%
   set_names(cohorts_name)%>%
   purrr::imap(~.x %>% mutate(cohort = .y))%>%
   bind_rows()%>%
+  left_join(pathways_process %>%
+              dplyr::select(label, data_type, process)%>%
+              dplyr::rename(variable = label), 
+            by = c("variable","data_type"))%>%
   dplyr::mutate(data_type = tolower(data_type))
 
-# Summary table of top-10 ranked pathways
-tbl_compare_vimp_survML_base_sens1_adj_top10 <- tbl_top10_vimp(
-  vims    = vimp_survML_base_sens1_adj_est,
-  compare = TRUE,
-  n_top   = 10
+# Min-Max VIM for DNA
+lapply(
+  cohorts_name, 
+  function(x) 
+    vimp_survML_base_sens1_adj_est %>%
+    dplyr::filter(data_type == "dna_pathways" & cohort == x)%>%
+    dplyr::select(est)%>%
+    summary()
 )
 
-# Cross-cohort comparison 
-tbl_vimp_survML_base_sens1_adj_top10_overlap <- tbl_top_overlap_vimp(
-  vims = vimp_survML_base_sens1_adj_est, 
-  k = 10
-)
+# Plots of VIMs
+vimp_survML_base_sens1_adj_est_split <- vimp_survML_base_sens1_adj_est %>%
+  group_split_custom(data_type, landmark_time)
+width <- set_names(c(20,9,23,9), names(vimp_survML_base_sens1_adj_est_split))
+height <- set_names(c(15,5,20,5), names(vimp_survML_base_sens1_adj_est_split))
+process_panel <- set_names(c(T,F,T,F), names(vimp_survML_base_sens1_adj_est_split))
+
+vimp_survML_base_sens1_adj_est_split %>%
+  purrr::imap(~ plot_vimp_est(
+    .x,
+    ylab   = "",
+    type   = "barplot",
+    process_panel = process_panel[.y], 
+    fill_by = "cohort",
+    fill_label = ""
+  )) %>%
+  purrr::iwalk(~ save_plot(.x, here::here("outputs","figures"),
+                           paste0("compare_barplot_surv_vimp_base_sens1_adj_est_", .y,
+                                  "_panel"),
+                           width[.y], height[.y]))
 
 #### Alternative DNA pathway definitions ----
 
-# At least two altered genes 
+##### At least two altered genes ----  
 
 # Load all results 
 vimp_survML_base_sens2_two_genes_est <- cohorts %>%
@@ -499,20 +531,88 @@ vimp_survML_base_sens2_two_genes_est <- cohorts %>%
   set_names(cohorts_name)%>%
   purrr::imap(~.x %>% mutate(cohort = .y))%>%
   bind_rows()%>%
+  left_join(pathways_process %>%
+              dplyr::select(label, data_type, process)%>%
+              dplyr::rename(variable = label), 
+            by = c("variable","data_type"))%>%
   dplyr::mutate(data_type = tolower(data_type))
 
-# Summary table of top-10 ranked pathways
-tbl_compare_vimp_survML_base_sens2_two_genes_top10 <- tbl_top10_vimp(
-  vims    = vimp_survML_base_sens2_two_genes_est,
-  compare = TRUE,
-  n_top   = 10
+# Min-Max VIM for DNA
+lapply(
+  cohorts_name, 
+  function(x) 
+    vimp_survML_base_sens2_two_genes_est %>%
+    dplyr::filter(data_type == "dna_pathways" & cohort == x)%>%
+    dplyr::select(est)%>%
+    summary()
 )
 
-# Cross-cohort comparison 
-tbl_vimp_survML_base_sens2_two_genes_top10_overlap <- tbl_top_overlap_vimp(
-  vims = vimp_survML_base_sens2_two_genes_est, 
-  k = 10
+# Plots of VIMs
+vimp_survML_base_sens2_two_genes_est_split <- vimp_survML_base_sens2_two_genes_est %>%
+  group_split_custom(data_type, landmark_time)
+width <- set_names(c(20,9,23,9), names(vimp_survML_base_sens2_two_genes_est_split))
+height <- set_names(c(15,5,20,5), names(vimp_survML_base_sens2_two_genes_est_split))
+process_panel <- set_names(c(T,F,T,F), names(vimp_survML_base_sens2_two_genes_est_split))
+
+vimp_survML_base_sens2_two_genes_est_split %>%
+  purrr::imap(~ plot_vimp_est(
+    .x,
+    ylab   = "",
+    type   = "barplot",
+    process_panel = process_panel[.y], 
+    fill_by = "cohort",
+    fill_label = ""
+  )) %>%
+  purrr::iwalk(~ save_plot(.x, here::here("outputs","figures"),
+                           paste0("compare_barplot_surv_vimp_base_sens2_two_genes_est_", .y,
+                                  "_panel"),
+                           width[.y], height[.y]))
+
+##### Proportion of constituent altered genes ---- 
+vimp_survML_base_sens3_prop_est <- cohorts %>%
+  purrr::map(~readRDS(here::here(
+    "outputs","results",
+    paste0(.x,"_vimp_survML_base_sens3_prop_est.rds"))))%>%
+  set_names(cohorts_name) %>%
+  purrr::imap(~.x %>% mutate(cohort = .y))%>%
+  bind_rows()%>%
+  left_join(pathways_process %>%
+              dplyr::select(label, data_type, process)%>%
+              dplyr::rename(variable = label), 
+            by = c("variable","data_type"))%>%
+  dplyr::mutate(data_type = tolower(data_type))
+
+
+# Min-Max VIM for DNA
+lapply(
+  cohorts_name, 
+  function(x) 
+    vimp_survML_base_sens3_prop_est %>%
+    dplyr::filter(data_type == "dna_pathways" & cohort == x)%>%
+    dplyr::select(est)%>%
+    summary()
 )
+
+# Plots of VIMs
+vimp_survML_base_sens3_prop_est_split <- vimp_survML_base_sens3_prop_est %>%
+  group_split_custom(data_type, landmark_time)
+width <- set_names(c(20,9,23,9), names(vimp_survML_base_sens3_prop_est_split))
+height <- set_names(c(15,5,20,5), names(vimp_survML_base_sens3_prop_est_split))
+process_panel <- set_names(c(T,F,T,F), names(vimp_survML_base_sens3_prop_est_split))
+
+vimp_survML_base_sens3_prop_est_split %>%
+  purrr::imap(~ plot_vimp_est(
+    .x,
+    ylab   = "",
+    type   = "barplot",
+    process_panel = process_panel[.y], 
+    fill_by = "cohort",
+    fill_label = ""
+  )) %>%
+  purrr::iwalk(~ save_plot(.x, here::here("outputs","figures"),
+                           paste0("compare_barplot_surv_vimp_base_sens3_prop_est_", .y,
+                                  "_panel"),
+                           width[.y], height[.y]))
 
 ## Pooled analysis ----
 
