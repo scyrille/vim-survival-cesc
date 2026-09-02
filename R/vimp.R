@@ -935,7 +935,8 @@ plot_vimp_est <- function(
 # Summary tables of all VIM estimates
 tbl_vimp <- function(
     vims,
-    compare = TRUE
+    compare = TRUE,
+    digits = 3
 ) {
   
   # ------------------------------------------------------------------#
@@ -1034,7 +1035,7 @@ tbl_vimp <- function(
       ) %>%
       gt::fmt_number(
         columns = est,
-        decimals = 3
+        decimals = digits
       ) %>%
       gt::tab_source_note(
         "VIM: variable importance point estimate"
@@ -1049,7 +1050,7 @@ tbl_vimp <- function(
     prepared_vims <- vims %>%
       dplyr::mutate(
         est_ci = sprintf(
-          "%.3f [%.3f–%.3f]",
+          "%.", digits,"f [%.", digits,"f–%.", digits,"f]",
           est,
           cil_1sided,
           ciu
@@ -1648,7 +1649,7 @@ tbl_top10_vimp <- function(
         tbl <- tbl %>%
           gt::tab_spanner(
             columns = gt::ends_with("_raids"),
-            variable = gt::md("**Bio-RAIDs**")
+            label = gt::md("**Bio-RAIDs**")
           )
       }
       
@@ -1656,7 +1657,7 @@ tbl_top10_vimp <- function(
         tbl <- tbl %>%
           gt::tab_spanner(
             columns = gt::ends_with("_tcga"),
-            variable = gt::md("**TCGA-CESC**")
+            label = gt::md("**TCGA-CESC**")
           )
       }
       
@@ -1721,7 +1722,7 @@ tbl_top10_vimp <- function(
       tbl <- tbl %>%
         gt::tab_spanner(
           columns = gt::ends_with("_raids"),
-          variable = gt::md("**Bio-RAIDs**")
+          label = gt::md("**Bio-RAIDs**")
         )
     }
 
@@ -1729,7 +1730,7 @@ tbl_top10_vimp <- function(
       tbl <- tbl %>%
         gt::tab_spanner(
           columns = gt::ends_with("_tcga"),
-          variable = gt::md("**TCGA-CESC**")
+          label = gt::md("**TCGA-CESC**")
         )
     }
     
