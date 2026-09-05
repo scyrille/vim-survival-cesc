@@ -188,16 +188,8 @@ plot_dichotomous(df                = combined$pathway$clin_dna_rna,
 
 tbl_compare_dna_pathways <- combined$pathway$clin_dna_rna %>%
   dplyr::select(cohort, starts_with("genomic_pathway") & 
-                  ends_with("any_gene"))%>%
-  tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
-  # add_p(test = everything()~"fisher.test")%>%
-  modify_header(label = "")%>%
-  bold_labels()
-
-# show all levels 
-tbl_compare_dna_pathways_one_gene <- combined$pathway$clin_dna_rna %>%
-  dplyr::select(cohort, starts_with("genomic_pathway") & 
-                  ends_with("any_gene"), -genomic_pathway_others_any_gene)%>%
+                  ends_with("any_gene"), 
+                -genomic_pathway_others_any_gene)%>%
   dplyr::mutate(across(ends_with("any_gene"),
                        ~factor(.x, 0:1, c("Non-altered","Altered"))))%>%
   dplyr::rename_with(~ gsub("_any_gene$", "", .x), 
@@ -209,11 +201,17 @@ tbl_compare_dna_pathways_one_gene <- combined$pathway$clin_dna_rna %>%
                       -genomic_pathway_others_any_gene))%>%
       set_names(gsub("_any_gene", "", names(.)))
   )%>%
-  tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
-  add_p(test = everything()~"fisher.test")%>%
-  bold_p()%>%
+  tbl_summary(
+    by        = cohort,
+    type      = everything() ~ "dichotomous",
+    value     = everything() ~ "Altered",
+    statistic = everything() ~ "{n} ({p}%)",
+    digits    = everything() ~ c(0, 0)
+  )%>%
+  # add_p(test = everything()~"fisher.test")%>%
   modify_header(label = "")%>%
   bold_labels()
+
 
 tbl_combined_dna_pathways <- combined$pathway$clin_dna_rna %>%
   dplyr::select(cohort, figo_c_f, starts_with("genomic_pathway") & 
@@ -234,7 +232,9 @@ tbl_combined_dna_pathways <- combined$pathway$clin_dna_rna %>%
 # At least 2 altered genes
 tbl_compare_dna_pathways_two_genes <- combined$pathway$clin_dna_rna %>%
   dplyr::select(cohort, starts_with("genomic_pathway") & 
-                  ends_with("two_genes"), -genomic_pathway_others_two_genes)%>%
+                  ends_with("two_genes"),
+                -genomic_pathway_others_two_genes
+                )%>%
   dplyr::mutate(across(ends_with("two_genes"),
                        ~factor(.x, 0:1, c("Non-altered","Altered"))))%>%
   dplyr::rename_with(~ gsub("_two_genes$", "", .x), 
@@ -242,18 +242,23 @@ tbl_compare_dna_pathways_two_genes <- combined$pathway$clin_dna_rna %>%
   set_variable_labels(
     .labels = var_label(
       combined$pathway$clin_dna_rna %>%
-        dplyr::select(ends_with("two_genes"),  
+        dplyr::select(ends_with("two_genes"),
                       -genomic_pathway_others_two_genes))%>%
       set_names(gsub("_two_genes", "", names(.)))
   )%>%
-  tbl_summary(by = cohort, digits = everything()~c(0,0))%>%
-  add_p(test = everything()~"fisher.test")%>%
-  bold_p()%>%
+  tbl_summary(
+    by        = cohort,
+    type      = everything() ~ "dichotomous",
+    value     = everything() ~ "Altered",
+    statistic = everything() ~ "{n} ({p}%)",
+    digits    = everything() ~ c(0, 0)
+  )%>%
+  # add_p(test = everything()~"fisher.test")%>%
   modify_header(label = "")%>%
   bold_labels()
 
 tbl_compare_dna_pathways_one_two_genes <- list(
-  tbl_compare_dna_pathways_one_gene,
+  tbl_compare_dna_pathways,
   tbl_compare_dna_pathways_two_genes)%>%
   tbl_merge(tab_spanner = c("**At least one altered gene**",
                             "**At least two altered genes**"))
