@@ -792,62 +792,74 @@ tbl_cox <- function(data,
 #'
 #' @export
 compute_global_test <- function(data_gene,
-                                data_pathway, 
-                                time, 
-                                event, 
-                                clin, 
-                                dna_pattern, 
-                                dna_pathway_pattern, 
-                                rna_pattern, 
-                                rna_pathway_pattern){
+                                data_pathway,
+                                time,
+                                event,
+                                clin,
+                                dna_pattern = NULL,
+                                dna_pathway_prefix = NULL,
+                                dna_pathway_suffix = NULL, 
+                                rna_pattern = NULL,
+                                rna_pathway_prefix = NULL) {
   
-  dna_vars <- data_gene %>% 
-    dplyr::select(starts_with(dna_pattern))%>%
-    colnames()
-  dna_pathway_vars <- data_pathway %>% 
-    dplyr::select(starts_with(dna_pathway_pattern))%>%
-    colnames()
-  rna_vars <- data_gene %>% 
-    dplyr::select(starts_with(rna_pattern))%>%
-    colnames()
-  rna_pathway_vars <- data_pathway %>% 
-    dplyr::select(starts_with(rna_pathway_pattern))%>%
-    colnames()
-  
-  .gt_surv <- function(.data, X) {
-    Y <- survival::Surv(.data[[time]], .data[[event]])
-    X <- .data %>% 
-      dplyr::select(all_of(X))%>%
-      as.matrix()
-    janitor::clean_names(data.frame(globaltest::gt(Y, X)@result))%>%
-      dplyr::relocate(x_cov, statistic, expected, std_dev, p_value)
+  # Select variables using a prefix and an optional suffix
+  .select_vars <- function(.data, pattern, suffix = NULL) {
+    if (is.null(pattern)) return(character(0))
+    
+    vars <- .data %>%
+      dplyr::select(dplyr::starts_with(pattern))
+    
+    if (!is.null(suffix)) {
+      vars <- vars %>%
+        dplyr::select(dplyr::ends_with(suffix))
+    }
+    
+    colnames(vars)
   }
   
-  gt_clin <- tibble(
-    data_type = "Clinicobiological",
-    .gt_surv(data_gene, clin)
-    )
-  gt_dna <- tibble(
-    data_type = "DNA (gene-level)",
-    .gt_surv(data_gene, dna_vars)
-    )
-  gt_dna_pathway <- tibble(
-    data_type = "DNA (pathway-level)",
-    .gt_surv(data_pathway, dna_pathway_vars)
-    )
-  gt_rna <- tibble(
-    data_type = "RNA (gene-level)",
-    .gt_surv(data_gene, rna_vars)
-    )
-  gt_rna_pathway <- tibble(
-    data_type = "RNA (pathway-level)",
-    .gt_surv(data_pathway, rna_pathway_vars)
-    )
+  # Compute the global test only when variables are available
+  .gt_surv <- function(.data, vars, data_type) {
+    if (length(vars) == 0L) return(NULL)
+    
+    Y <- survival::Surv(.data[[time]], .data[[event]])
+    
+    X <- .data %>%
+      dplyr::select(dplyr::all_of(vars)) %>%
+      as.matrix()
+    
+    result <- globaltest::gt(Y, X)@result %>%
+      as.data.frame() %>%
+      janitor::clean_names() %>%
+      dplyr::relocate(number_cov, statistic, expected, std_dev, p_value)
+    
+    tibble::tibble(data_type = data_type, result)
+  }
   
-  list(gt_clin, 
-       gt_dna, 
-       gt_dna_pathway,
-       gt_rna, 
-       gt_rna_pathway)%>%
-    bind_rows()
+  dplyr::bind_rows(
+    .gt_surv(
+      data_gene, clin,
+      "Clinicobiological"
+    ),
+    .gt_surv(
+      data_gene, .select_vars(data_gene, dna_pattern),
+      "DNA (gene-level)"
+    ),
+    .gt_surv(
+      data_pathway,
+      .select_vars(
+        data_pathway,
+        dna_pathway_prefix,
+        suffix = dna_pathway_suffix
+      ),
+      "DNA (pathway-level)"
+    ),
+    .gt_surv(
+      data_gene, .select_vars(data_gene, rna_pattern),
+      "RNA (gene-level)"
+    ),
+    .gt_surv(
+      data_pathway, .select_vars(data_pathway, rna_pathway_prefix),
+      "RNA (pathway-level)"
+    )
+  )
 }
