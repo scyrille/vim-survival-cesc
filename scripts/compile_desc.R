@@ -530,7 +530,8 @@ tbl_compare_global_test <-
     raids = list(gene    = raids$gene$clin_dna_rna,
                  pathway = raids$pathway$clin_dna_rna),
     tcga = list(gene     = tcga$gene$clin_dna_rna,
-                pathway  = tcga$pathway$clin_dna_rna)) %>%
+                pathway  = tcga$pathway$clin_dna_rna)
+  )%>%
   purrr::imap(~compute_global_test(
     data_gene            = .x$gene, 
     data_pathway         = .x$pathway,
@@ -538,9 +539,10 @@ tbl_compare_global_test <-
     event                = "event",
     clin                 = c("age","figo","hpv_negative"), 
     dna_pattern          = "altered_",
-    dna_pathway_pattern  = "genomic_pathway", 
+    dna_pathway_prefix  = "genomic_pathway", 
+    dna_pathway_suffix  = "any_gene", 
     rna_pattern          = "rna_seq_", 
-    rna_pathway_pattern  = "hallmark_"
+    rna_pathway_prefix  = "hallmark_"
   )
   )%>%
   imap(~{.x %>% rename_at(vars(-data_type), 
@@ -550,7 +552,7 @@ tbl_compare_global_test <-
   gt::tab_spanner(label = gt::md("**Bio-RAIDs**"), columns = matches("raids"))%>%
   gt::tab_spanner(label = gt::md("**TCGA-CESC**"), columns = matches("tcga"))%>%
   gt::cols_label(data_type = gt::md("**Data type**"), 
-                 starts_with("x_cov")~ gt::md("**No of<br>features**"),
+                 starts_with("number_cov")~ gt::md("**No of<br>features**"),
                  starts_with("statistic")~ gt::md("**Statistic**"),
                  starts_with("expected")~ gt::md("**Expected**"),
                  starts_with("std_dev")~ gt::md("**Standard<br>deviation**"),
@@ -560,7 +562,7 @@ tbl_compare_global_test <-
   gt::tab_style_body(style = gt::cell_text(weight = "bold"),
                      columns =  starts_with("p"),
                      fn = function(x) x < 0.05)%>%
-  gt::fmt_number(decimals = 2, columns = -c(matches(c("p_val","x_cov"))))%>%
+  gt::fmt_number(decimals = 2, columns = matches(c("statistic","expected","std_dev")))%>%
   gt::fmt(columns = starts_with("p_val"), 
           fns = function(x) ifelse(
             x < 0.05, formatC(x, format = "f", digits = 3),
@@ -576,6 +578,74 @@ tbl_compare_global_test <-
       sep = "; ")
   )
 
+# Alternation DNA pathways definitions 
+
+temp_raids_global_test_dna <- c("_any_gene","_two_genes","_prop") %>%
+  purrr::map(~compute_global_test(
+    data_gene            = raids$gene$clin_dna_rna, 
+    data_pathway         = raids$pathway$clin_dna_rna,
+    time                 = "time",
+    event                = "event",
+    clin                 = NULL, 
+    dna_pattern          = NULL,
+    dna_pathway_prefix   = "genomic_pathway", 
+    dna_pathway_suffix   = .x, 
+    rna_pattern          = NULL, 
+    rna_pathway_prefix   = NULL
+  )
+)%>%
+  bind_rows()%>%
+  dplyr::mutate(data_type = c("At least one altered gene",
+                              "At least two altered genes",
+                              "Proportion of altered genes"))
+ 
+temp_tcga_global_test_dna <- c("_any_gene","_two_genes","_prop") %>%
+  purrr::map(~compute_global_test(
+    data_gene            = tcga$gene$clin_dna_rna, 
+    data_pathway         = tcga$pathway$clin_dna_rna,
+    time                 = "time",
+    event                = "event",
+    clin                 = NULL, 
+    dna_pattern          = NULL,
+    dna_pathway_prefix   = "genomic_pathway", 
+    dna_pathway_suffix   = .x, 
+    rna_pattern          = NULL, 
+    rna_pathway_prefix   = NULL
+  )
+)%>%
+  bind_rows()%>%
+  dplyr::mutate(data_type = c("At least one altered gene",
+                              "At least two altered genes",
+                              "Proportion of altered genes"))
+
+tbl_compare_global_test_dna <- list(
+  raids = temp_raids_global_test_dna, 
+  tcga = temp_tcga_global_test_dna
+)%>%
+  imap(~{.x %>% rename_at(vars(-data_type), 
+                          function(x) paste(x, .y, sep = "_"))})%>%
+  purrr::reduce(inner_join, by = "data_type")%>%
+  gt::gt()%>%
+  gt::tab_spanner(label = gt::md("**Bio-RAIDs**"), columns = matches("raids"))%>%
+  gt::tab_spanner(label = gt::md("**TCGA-CESC**"), columns = matches("tcga"))%>%
+  gt::cols_label(data_type = gt::md("**Data type**"), 
+                 starts_with("number_cov")~ gt::md("**No of<br>features**"),
+                 starts_with("statistic")~ gt::md("**Statistic**"),
+                 starts_with("expected")~ gt::md("**Expected**"),
+                 starts_with("std_dev")~ gt::md("**Standard<br>deviation**"),
+                 starts_with("p_value")~ gt::md("**p-value**"))%>%
+  gt::tab_style(style = list(gt::cell_text(weight = "bold")),
+                locations = gt::cells_column_labels())%>%
+  gt::tab_style_body(style = gt::cell_text(weight = "bold"),
+                     columns =  starts_with("p"),
+                     fn = function(x) x < 0.05)%>%
+  gt::fmt_number(decimals = 2, columns = matches(c("statistic","expected","std_dev")))%>%
+  gt::fmt(columns = starts_with("p_val"), 
+          fns = function(x) ifelse(
+            x < 0.05, formatC(x, format = "f", digits = 3),
+            ifelse(x < 0.001, "<0.001",
+                   formatC(x, format = "f", digits = 2))))
+  
 # ---------------------------- Save all tables --------------------------#
 
 for (i in setdiff(ls(pattern = "tbl_"), lsf.str())){
