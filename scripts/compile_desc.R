@@ -504,7 +504,15 @@ tbl_compare_cox_univ <- list(
     covars = c("age_c_f", "figo_c_f", "hpv_negative_f"),
     model  = "univ")
 )%>%
-  tbl_merge(tab_spanner = c("**Bio-RAIDs**","**TCGA-CESC**"))
+  gtsummary::tbl_merge(tab_spanner = c("**Bio-RAIDs**","**TCGA-CESC**"))%>%
+  gtsummary::modify_column_merge(pattern = "{stat_nevent_1}/{stat_n_1}",
+                                 rows = !is.na(stat_nevent_1))%>%
+  gtsummary::modify_column_merge(pattern = "{stat_nevent_2}/{stat_n_2}",
+                                 rows = !is.na(stat_nevent_2))%>%
+  gtsummary::modify_header(
+    stat_nevent_1 = "**No. of events/\nNo. of patients**",
+    stat_nevent_2 = "**No. of events/\nNo. of patients**",
+  )
 
 tbl_compare_cox_multi <- list(
   tbl_cox(
@@ -520,7 +528,15 @@ tbl_compare_cox_multi <- list(
     covars = c("age_c_f", "figo_c_f", "hpv_negative_f"),
     model  = "multi")
 )%>%
-  tbl_merge(tab_spanner = c("**Bio-RAIDs**","**TCGA-CESC**"))
+  gtsummary::tbl_merge(tab_spanner = c("**Bio-RAIDs**","**TCGA-CESC**"))%>%
+  gtsummary::modify_column_merge(pattern = "{stat_nevent_1}/{stat_n_1}",
+                                 rows = !is.na(stat_nevent_1))%>%
+  gtsummary::modify_column_merge(pattern = "{stat_nevent_2}/{stat_n_2}",
+                                 rows = !is.na(stat_nevent_2))%>%
+  gtsummary::modify_header(
+    stat_nevent_1 = "**No. of events/\nNo. of patients**",
+    stat_nevent_2 = "**No. of events/\nNo. of patients**",
+  )
 
 
 # Global test -------------------------------------------------------------
@@ -552,7 +568,7 @@ tbl_compare_global_test <-
   gt::tab_spanner(label = gt::md("**Bio-RAIDs**"), columns = matches("raids"))%>%
   gt::tab_spanner(label = gt::md("**TCGA-CESC**"), columns = matches("tcga"))%>%
   gt::cols_label(data_type = gt::md("**Data type**"), 
-                 starts_with("number_cov")~ gt::md("**No of<br>features**"),
+                 starts_with("number_cov")~ gt::md("**No. of<br>features**"),
                  starts_with("statistic")~ gt::md("**Statistic**"),
                  starts_with("expected")~ gt::md("**Expected**"),
                  starts_with("std_dev")~ gt::md("**Standard<br>deviation**"),
@@ -629,7 +645,7 @@ tbl_compare_global_test_dna <- list(
   gt::tab_spanner(label = gt::md("**Bio-RAIDs**"), columns = matches("raids"))%>%
   gt::tab_spanner(label = gt::md("**TCGA-CESC**"), columns = matches("tcga"))%>%
   gt::cols_label(data_type = gt::md("**Data type**"), 
-                 starts_with("number_cov")~ gt::md("**No of<br>features**"),
+                 starts_with("number_cov")~ gt::md("**No. of<br>features**"),
                  starts_with("statistic")~ gt::md("**Statistic**"),
                  starts_with("expected")~ gt::md("**Expected**"),
                  starts_with("std_dev")~ gt::md("**Standard<br>deviation**"),
