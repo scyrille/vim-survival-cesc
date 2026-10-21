@@ -378,7 +378,8 @@ make_input_vimp_survML_base <- function(data,
     dplyr::select(
       dplyr::all_of(var_clin),
       dplyr::starts_with(dna_prefix) & dplyr::ends_with(dna_suffix),
-      dplyr::starts_with(rna_prefix)
+      dplyr::starts_with(rna_prefix),
+      -starts_with("genomic_pathway_others")
     )
   
   base_features <- paste0(which(names(X) %in% var_clin))%>%
@@ -2083,7 +2084,7 @@ tbl_top_overlap_vimp <- function(vims, k = 10, B = 10000, seed = 123){
   
   .top_overlap <- function(vims_raids, vims_tcga, k, B, seed, modality){
     
-    set.seed(123)
+    set.seed(seed)
     
     # Spearman correlation
     spearman_rho <- cor(vims_raids, vims_tcga, method = "spearman")
@@ -2160,11 +2161,16 @@ tbl_top_overlap_vimp <- function(vims, k = 10, B = 10000, seed = 123){
   rna_top_k <- .top_overlap(vims_raids = vims_split$`Bio-RAIDs_rna_pathways_24`, 
                             vims_tcga  = vims_split$`TCGA-CESC_rna_pathways_24`,
                             k = k, B = B, seed = seed, modality = "RNA")
-  overall_top_k <- .top_overlap(vims_raids = c(vims_split$`Bio-RAIDs_dna_pathways_24`,
-                                               vims_split$`Bio-RAIDs_rna_pathways_24`), 
-                                vims_tcga  = c(vims_split$`TCGA-CESC_dna_pathways_24`,
-                                               vims_split$`TCGA-CESC_rna_pathways_24`),
-                                k = k, B = B, seed = seed, modality = "Overall")
+  overall_top_k <- .top_overlap(
+    vims_raids = c(set_names(vims_split$`Bio-RAIDs_dna_pathways_24`,
+                             ~ paste(.x, "(DNA pathway)")),
+                   set_names(vims_split$`Bio-RAIDs_rna_pathways_24`,
+                             ~ paste(.x, "(RNA pathway)"))), 
+    vims_tcga  = c(set_names(vims_split$`TCGA-CESC_dna_pathways_24`,
+                             ~ paste(.x, "(DNA pathway)")),
+                   set_names(vims_split$`TCGA-CESC_rna_pathways_24`,
+                             ~ paste(.x, "(RNA pathway)"))),
+    k = k, B = B, seed = seed, modality = "Overall")
   
   list(dna_top_k, rna_top_k, overall_top_k)%>%
     purrr::reduce(full_join, by = "Metric")%>%
