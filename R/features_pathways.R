@@ -243,7 +243,7 @@ get_pathways_process <- function(){
       "Senescence",                       "Senescence",                      "Proliferation",                  "DNA_pathways", 
       "TGF-beta",                         "TGF-\u03b2",                      "Signaling",                      "DNA_pathways",
       "Transcription factor-regulator",   "Transcriptional regulator",       "Metabolic",                      "DNA_pathways",
-      "Wnt Signaling Pathway",            "Wnt",                             "Signaling",                      "DNA_pathways", 
+      "Wnt Signaling Pathway",            "Wnt",                             "Signaling",                      "DNA_pathways",          
     )%>%
     dplyr::arrange(process, label)%>%
     dplyr::mutate(num = 1:dplyr::n(), .before = variable)
