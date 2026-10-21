@@ -347,8 +347,6 @@ tbl_compare_vimp_survML_full_top10 <- vimp_survML_full_est %>%
 ### Main analysis ----
 
 # Load all results 
- 
-
 vimp_survML_base_est <- cohorts %>%
   purrr::map(~readRDS(here::here("outputs","results",
                                  paste0(.x,"_vimp_survML_base_est.rds"))))%>%
@@ -356,10 +354,14 @@ vimp_survML_base_est <- cohorts %>%
   purrr::imap(~.x %>% mutate(cohort = .y))%>%
   bind_rows()%>%
   left_join(pathways_process %>%
-              dplyr::select(label, data_type, process)%>%
+              dplyr::select(label, data_type, process, variable_name)%>%
               dplyr::rename(variable = label), 
             by = c("variable","data_type"))%>%
-  dplyr::mutate(data_type = tolower(data_type))
+  dplyr::mutate(data_type = tolower(data_type),
+                variable_name = ifelse(data_type == "dna_pathways", 
+                                       paste0(variable_name, "_any_gene"),
+                                       variable_name))%>%
+  dplyr::filter(variable != "")
 
 # Plots of VIMs
 vimp_survML_base_est_split <- vimp_survML_base_est %>%
